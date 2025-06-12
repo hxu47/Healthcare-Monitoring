@@ -355,6 +355,12 @@ Outputs:
     Export:
       Name: !Sub '${AWS::StackName}-ApiGatewayLatencyAlarmArn'
 
+  DynamoDBThrottleAlarmArn:
+    Description: ARN of the DynamoDB Throttle Alarm
+    Value: !GetAtt DynamoDBThrottleAlarm.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DynamoDBThrottleAlarmArn'
+
   MonitoringFeatures:
     Description: List of implemented monitoring features
     Value: 'CloudWatch Dashboard, Lambda monitoring, API Gateway monitoring, DynamoDB monitoring, Kinesis monitoring, SNS monitoring, Custom alarms'
