@@ -142,35 +142,6 @@ Resources:
           ]
         }
 
-  # Custom Metric for Critical Vital Signs
-  CriticalVitalSignsMetricFilter:
-    Type: AWS::Logs::MetricFilter
-    Properties:
-      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-vitals-processor'
-      FilterPattern: '[timestamp, requestId, level="CRITICAL", ...]'
-      MetricTransformations:
-        - MetricNamespace: !Sub '${ProjectName}/Healthcare'
-          MetricName: CriticalVitalSigns
-          MetricValue: '1'
-          DefaultValue: 0
-
-  # Alarm for Critical Vital Signs
-  CriticalVitalSignsAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub '${ProjectName}-Critical-Vital-Signs-Alert'
-      AlarmDescription: 'Alert when critical vital signs exceed threshold'
-      MetricName: CriticalVitalSigns
-      Namespace: !Sub '${ProjectName}/Healthcare'
-      Statistic: Sum
-      Period: 3600
-      EvaluationPeriods: 1
-      Threshold: !Ref CriticalVitalSignsThreshold
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      AlarmActions:
-        - Fn::ImportValue: !Sub '${IoTStackName}-CriticalAlertsTopicArn'
-      TreatMissingData: notBreaching
-
   # Alarm for Lambda Function Errors
   LambdaErrorAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -229,25 +200,119 @@ Resources:
       AlarmActions:
         - Fn::ImportValue: !Sub '${IoTStackName}-CriticalAlertsTopicArn'
 
-  # Log Group for Application Logs
+  # Alarm for Kinesis Stream Issues
+  KinesisStreamErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-Kinesis-Stream-Errors'
+      AlarmDescription: 'Alert when Kinesis stream has write errors'
+      MetricName: WriteProvisionedThroughputExceeded
+      Namespace: AWS/Kinesis
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: StreamName
+          Value: !Sub '${ProjectName}-vital-signs-stream'
+      AlarmActions:
+        - Fn::ImportValue: !Sub '${IoTStackName}-CriticalAlertsTopicArn'
+
+  # Alarm for SNS Delivery Failures
+  SNSDeliveryFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-SNS-Delivery-Failures'
+      AlarmDescription: 'Alert when SNS notifications fail to deliver'
+      MetricName: NumberOfNotificationsFailed
+      Namespace: AWS/SNS
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TopicName
+          Value: !Sub '${ProjectName}-critical-alerts'
+      AlarmActions:
+        - Fn::ImportValue: !Sub '${IoTStackName}-CriticalAlertsTopicArn'
+
+  # Log Group for Application Logs (create it explicitly)
   ApplicationLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/aws/healthcare/${ProjectName}'
       RetentionInDays: 30
 
-  # Log Stream for Critical Events
-  CriticalEventsLogStream:
-    Type: AWS::Logs::LogStream
+  # Log Group for Lambda Functions (create them explicitly)
+  VitalSignsProcessorLogGroup:
+    Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Ref ApplicationLogGroup
-      LogStreamName: critical-events
+      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-vitals-processor'
+      RetentionInDays: 14
+
+  IoTSimulatorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-iot-simulator'
+      RetentionInDays: 14
+
+  PatientManagementLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-patient-management'
+      RetentionInDays: 14
+
+  VitalSignsApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-vitals-api'
+      RetentionInDays: 14
+
+  AlertManagementLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-alert-management'
+      RetentionInDays: 14
+
+  # Now create metric filters that depend on the log groups
+  CriticalVitalSignsMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    DependsOn: VitalSignsProcessorLogGroup
+    Properties:
+      LogGroupName: !Ref VitalSignsProcessorLogGroup
+      FilterPattern: '[timestamp, requestId, level="CRITICAL", ...]'
+      MetricTransformations:
+        - MetricNamespace: !Sub '${ProjectName}/Healthcare'
+          MetricName: CriticalVitalSigns
+          MetricValue: '1'
+          DefaultValue: 0
+
+  # Custom Alarm for Critical Vital Signs
+  CriticalVitalSignsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    DependsOn: CriticalVitalSignsMetricFilter
+    Properties:
+      AlarmName: !Sub '${ProjectName}-Critical-Vital-Signs-Alert'
+      AlarmDescription: 'Alert when critical vital signs exceed threshold'
+      MetricName: CriticalVitalSigns
+      Namespace: !Sub '${ProjectName}/Healthcare'
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: !Ref CriticalVitalSignsThreshold
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - Fn::ImportValue: !Sub '${IoTStackName}-CriticalAlertsTopicArn'
+      TreatMissingData: notBreaching
 
   # Custom Metric for Patient Status Distribution
   PatientStatusMetricFilter:
     Type: AWS::Logs::MetricFilter
+    DependsOn: VitalSignsProcessorLogGroup
     Properties:
-      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-vitals-processor'
+      LogGroupName: !Ref VitalSignsProcessorLogGroup
       FilterPattern: '[timestamp, requestId, level, status="Normal", ...]'
       MetricTransformations:
         - MetricNamespace: !Sub '${ProjectName}/PatientStatus'
@@ -257,8 +322,9 @@ Resources:
 
   CriticalPatientStatusMetricFilter:
     Type: AWS::Logs::MetricFilter
+    DependsOn: VitalSignsProcessorLogGroup
     Properties:
-      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-vitals-processor'
+      LogGroupName: !Ref VitalSignsProcessorLogGroup
       FilterPattern: '[timestamp, requestId, level, status="Critical", ...]'
       MetricTransformations:
         - MetricNamespace: !Sub '${ProjectName}/PatientStatus'
@@ -268,14 +334,46 @@ Resources:
 
   WarningPatientStatusMetricFilter:
     Type: AWS::Logs::MetricFilter
+    DependsOn: VitalSignsProcessorLogGroup
     Properties:
-      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-vitals-processor'
+      LogGroupName: !Ref VitalSignsProcessorLogGroup
       FilterPattern: '[timestamp, requestId, level, status="Warning", ...]'
       MetricTransformations:
         - MetricNamespace: !Sub '${ProjectName}/PatientStatus'
           MetricName: WarningPatients
           MetricValue: '1'
           DefaultValue: 0
+
+Outputs:
+  DashboardUrl:
+    Description: URL of the CloudWatch Dashboard
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${ProjectName}-Healthcare-Dashboard'
+    Export:
+      Name: !Sub '${AWS::StackName}-DashboardUrl'
+
+  ApplicationLogGroup:
+    Description: CloudWatch Log Group for application logs
+    Value: !Ref ApplicationLogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-ApplicationLogGroup'
+
+  CriticalVitalSignsAlarmArn:
+    Description: ARN of the Critical Vital Signs Alarm
+    Value: !GetAtt CriticalVitalSignsAlarm.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-CriticalVitalSignsAlarmArn'
+
+  LambdaErrorAlarmArn:
+    Description: ARN of the Lambda Error Alarm
+    Value: !GetAtt LambdaErrorAlarm.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaErrorAlarmArn'
+
+  MonitoringFeatures:
+    Description: List of implemented monitoring features
+    Value: 'Real-time dashboards, Critical alerts, Performance monitoring, Cost optimization'
+    Export:
+      Name: !Sub '${AWS::StackName}-MonitoringFeatures'
 
 Outputs:
   DashboardUrl:
