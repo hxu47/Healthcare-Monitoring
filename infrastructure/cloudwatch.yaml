@@ -1,0 +1,309 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Patient Vital Signs Monitoring - CloudWatch Monitoring and Alarms'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: VitalSignsMonitoring
+    Description: Name of the project, used as prefix for resource names
+  LambdaStackName:
+    Type: String
+    Default: vital-signs-lambda
+    Description: Name of the Lambda stack
+  ApiStackName:
+    Type: String
+    Default: vital-signs-api
+    Description: Name of the API Gateway stack
+  DynamoDBStackName:
+    Type: String
+    Default: vital-signs-dynamodb
+    Description: Name of the DynamoDB stack
+  IoTStackName:
+    Type: String
+    Default: vital-signs-iot
+    Description: Name of the IoT stack
+  CriticalVitalSignsThreshold:
+    Type: Number
+    Default: 5
+    Description: Number of critical vital signs alerts per hour before alarm
+  HighLatencyThreshold:
+    Type: Number
+    Default: 5000
+    Description: API Gateway latency threshold in milliseconds
+  ErrorRateThreshold:
+    Type: Number
+    Default: 10
+    Description: Error rate percentage threshold
+
+Resources:
+  # CloudWatch Dashboard for Healthcare Monitoring
+  HealthcareDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub '${ProjectName}-Healthcare-Dashboard'
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/Lambda", "Invocations", "FunctionName", "${LambdaStackName}-vitals-processor" ],
+                  [ ".", "Errors", ".", "." ],
+                  [ ".", "Duration", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Vital Signs Processing Lambda Metrics",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count", "ApiName", "${ProjectName}-healthcare-api" ],
+                  [ ".", "Latency", ".", "." ],
+                  [ ".", "4XXError", ".", "." ],
+                  [ ".", "5XXError", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "API Gateway Performance",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 6,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${DynamoDBStackName}-vital-signs" ],
+                  [ ".", "ConsumedWriteCapacityUnits", ".", "." ],
+                  [ ".", "ThrottledRequests", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "DynamoDB Vital Signs Table Metrics",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 6,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/Kinesis", "IncomingRecords", "StreamName", "${ProjectName}-vital-signs-stream" ],
+                  [ ".", "OutgoingRecords", ".", "." ],
+                  [ ".", "WriteProvisionedThroughputExceeded", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Kinesis Stream Metrics",
+                "period": 300
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 12,
+              "width": 24,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/SNS", "NumberOfMessagesPublished", "TopicName", "${ProjectName}-critical-alerts" ],
+                  [ ".", "NumberOfNotificationsFailed", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "Critical Alerts SNS Topic",
+                "period": 300
+              }
+            }
+          ]
+        }
+
+  # Custom Metric for Critical Vital Signs
+  CriticalVitalSignsMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-vitals-processor'
+      FilterPattern: '[timestamp, requestId, level="CRITICAL", ...]'
+      MetricTransformations:
+        - MetricNamespace: !Sub '${ProjectName}/Healthcare'
+          MetricName: CriticalVitalSigns
+          MetricValue: '1'
+          DefaultValue: 0
+
+  # Alarm for Critical Vital Signs
+  CriticalVitalSignsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-Critical-Vital-Signs-Alert'
+      AlarmDescription: 'Alert when critical vital signs exceed threshold'
+      MetricName: CriticalVitalSigns
+      Namespace: !Sub '${ProjectName}/Healthcare'
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: !Ref CriticalVitalSignsThreshold
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - Fn::ImportValue: !Sub '${IoTStackName}-CriticalAlertsTopicArn'
+      TreatMissingData: notBreaching
+
+  # Alarm for Lambda Function Errors
+  LambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-Lambda-Errors'
+      AlarmDescription: 'Alert when Lambda functions have errors'
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Sub '${LambdaStackName}-vitals-processor'
+      AlarmActions:
+        - Fn::ImportValue: !Sub '${IoTStackName}-CriticalAlertsTopicArn'
+
+  # Alarm for API Gateway High Latency
+  ApiGatewayLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-API-High-Latency'
+      AlarmDescription: 'Alert when API Gateway latency is high'
+      MetricName: Latency
+      Namespace: AWS/ApiGateway
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: !Ref HighLatencyThreshold
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ApiName
+          Value: !Sub '${ProjectName}-healthcare-api'
+      AlarmActions:
+        - Fn::ImportValue: !Sub '${IoTStackName}-CriticalAlertsTopicArn'
+
+  # Alarm for DynamoDB Throttling
+  DynamoDBThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${ProjectName}-DynamoDB-Throttling'
+      AlarmDescription: 'Alert when DynamoDB requests are throttled'
+      MetricName: ThrottledRequests
+      Namespace: AWS/DynamoDB
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: TableName
+          Value:
+            Fn::ImportValue: !Sub '${DynamoDBStackName}-VitalSignsTableName'
+      AlarmActions:
+        - Fn::ImportValue: !Sub '${IoTStackName}-CriticalAlertsTopicArn'
+
+  # Log Group for Application Logs
+  ApplicationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/healthcare/${ProjectName}'
+      RetentionInDays: 30
+
+  # Log Stream for Critical Events
+  CriticalEventsLogStream:
+    Type: AWS::Logs::LogStream
+    Properties:
+      LogGroupName: !Ref ApplicationLogGroup
+      LogStreamName: critical-events
+
+  # Custom Metric for Patient Status Distribution
+  PatientStatusMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-vitals-processor'
+      FilterPattern: '[timestamp, requestId, level, status="Normal", ...]'
+      MetricTransformations:
+        - MetricNamespace: !Sub '${ProjectName}/PatientStatus'
+          MetricName: NormalPatients
+          MetricValue: '1'
+          DefaultValue: 0
+
+  CriticalPatientStatusMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-vitals-processor'
+      FilterPattern: '[timestamp, requestId, level, status="Critical", ...]'
+      MetricTransformations:
+        - MetricNamespace: !Sub '${ProjectName}/PatientStatus'
+          MetricName: CriticalPatients
+          MetricValue: '1'
+          DefaultValue: 0
+
+  WarningPatientStatusMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${LambdaStackName}-vitals-processor'
+      FilterPattern: '[timestamp, requestId, level, status="Warning", ...]'
+      MetricTransformations:
+        - MetricNamespace: !Sub '${ProjectName}/PatientStatus'
+          MetricName: WarningPatients
+          MetricValue: '1'
+          DefaultValue: 0
+
+Outputs:
+  DashboardUrl:
+    Description: URL of the CloudWatch Dashboard
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${ProjectName}-Healthcare-Dashboard'
+    Export:
+      Name: !Sub '${AWS::StackName}-DashboardUrl'
+
+  ApplicationLogGroup:
+    Description: CloudWatch Log Group for application logs
+    Value: !Ref ApplicationLogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-ApplicationLogGroup'
+
+  CriticalVitalSignsAlarmArn:
+    Description: ARN of the Critical Vital Signs Alarm
+    Value: !GetAtt CriticalVitalSignsAlarm.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-CriticalVitalSignsAlarmArn'
+
+  LambdaErrorAlarmArn:
+    Description: ARN of the Lambda Error Alarm
+    Value: !GetAtt LambdaErrorAlarm.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaErrorAlarmArn'
+
+  MonitoringFeatures:
+    Description: List of implemented monitoring features
+    Value: 'Real-time dashboards, Critical alerts, Performance monitoring, Cost optimization'
+    Export:
+      Name: !Sub '${AWS::StackName}-MonitoringFeatures'

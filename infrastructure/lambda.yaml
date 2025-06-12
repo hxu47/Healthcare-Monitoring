@@ -1,0 +1,226 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Patient Vital Signs Monitoring - Lambda Functions for Healthcare Data Processing'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: VitalSignsMonitoring
+    Description: Name of the project, used as prefix for resource names
+  S3StackName:
+    Type: String
+    Default: vital-signs-s3
+    Description: Name of the S3 stack
+  DynamoDBStackName:
+    Type: String
+    Default: vital-signs-dynamodb
+    Description: Name of the DynamoDB stack
+  IoTStackName:
+    Type: String
+    Default: vital-signs-iot
+    Description: Name of the IoT stack
+  LambdaCodeBucket:
+    Type: String
+    Description: Bucket containing Lambda code packages
+    Default: vital-signs-lambda-code
+
+Resources:
+  # Lambda function for IoT data simulation
+  IoTSimulatorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-iot-simulator'
+      Handler: lambda_function.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Runtime: python3.9
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          IOT_ENDPOINT: !Sub '${AWS::AccountId}.iot.${AWS::Region}.amazonaws.com'
+          PATIENT_RECORDS_TABLE:
+            Fn::ImportValue: !Sub '${DynamoDBStackName}-PatientRecordsTableName'
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: iot-simulator.zip
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Lambda function for processing vital signs data from Kinesis
+  VitalSignsProcessorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-vitals-processor'
+      Handler: lambda_function.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Runtime: python3.9
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          VITAL_SIGNS_TABLE:
+            Fn::ImportValue: !Sub '${DynamoDBStackName}-VitalSignsTableName'
+          ALERT_CONFIG_TABLE:
+            Fn::ImportValue: !Sub '${DynamoDBStackName}-AlertConfigTableName'
+          ALERT_HISTORY_TABLE:
+            Fn::ImportValue: !Sub '${DynamoDBStackName}-AlertHistoryTableName'
+          SNS_TOPIC_ARN:
+            Fn::ImportValue: !Sub '${IoTStackName}-CriticalAlertsTopicArn'
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: vitals-processor.zip
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Event Source Mapping for Kinesis Stream
+  KinesisEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn:
+        Fn::ImportValue: !Sub '${IoTStackName}-VitalSignsKinesisStreamArn'
+      FunctionName: !GetAtt VitalSignsProcessorFunction.Arn
+      StartingPosition: LATEST
+      BatchSize: 100
+      MaximumBatchingWindowInSeconds: 5
+
+  # Lambda function for patient management API
+  PatientManagementFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-patient-management'
+      Handler: lambda_function.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Runtime: python3.9
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          PATIENT_RECORDS_TABLE:
+            Fn::ImportValue: !Sub '${DynamoDBStackName}-PatientRecordsTableName'
+          ALERT_CONFIG_TABLE:
+            Fn::ImportValue: !Sub '${DynamoDBStackName}-AlertConfigTableName'
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: patient-management.zip
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Lambda function for vital signs API
+  VitalSignsApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-vitals-api'
+      Handler: lambda_function.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Runtime: python3.9
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          VITAL_SIGNS_TABLE:
+            Fn::ImportValue: !Sub '${DynamoDBStackName}-VitalSignsTableName'
+          PATIENT_RECORDS_TABLE:
+            Fn::ImportValue: !Sub '${DynamoDBStackName}-PatientRecordsTableName'
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: vitals-api.zip
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Lambda function for alert management
+  AlertManagementFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-alert-management'
+      Handler: lambda_function.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Runtime: python3.9
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          ALERT_HISTORY_TABLE:
+            Fn::ImportValue: !Sub '${DynamoDBStackName}-AlertHistoryTableName'
+          ALERT_CONFIG_TABLE:
+            Fn::ImportValue: !Sub '${DynamoDBStackName}-AlertConfigTableName'
+          SNS_TOPIC_ARN:
+            Fn::ImportValue: !Sub '${IoTStackName}-CriticalAlertsTopicArn'
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: alert-management.zip
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # CloudWatch Event Rule for IoT Simulator (runs every 5 minutes)
+  IoTSimulatorScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${AWS::StackName}-iot-simulator-schedule'
+      Description: 'Trigger IoT simulator every 5 minutes for continuous data generation'
+      ScheduleExpression: 'rate(5 minutes)'
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt IoTSimulatorFunction.Arn
+          Id: 'IoTSimulatorTarget'
+
+  # Permission for CloudWatch Events to invoke IoT Simulator
+  IoTSimulatorInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref IoTSimulatorFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt IoTSimulatorScheduleRule.Arn
+
+Outputs:
+  IoTSimulatorFunctionArn:
+    Description: ARN of the IoT Simulator Lambda function
+    Value: !GetAtt IoTSimulatorFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-IoTSimulatorFunctionArn'
+
+  VitalSignsProcessorFunctionArn:
+    Description: ARN of the Vital Signs Processor Lambda function
+    Value: !GetAtt VitalSignsProcessorFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-VitalSignsProcessorFunctionArn'
+
+  PatientManagementFunctionArn:
+    Description: ARN of the Patient Management Lambda function
+    Value: !GetAtt PatientManagementFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-PatientManagementFunctionArn'
+
+  VitalSignsApiFunctionArn:
+    Description: ARN of the Vital Signs API Lambda function
+    Value: !GetAtt VitalSignsApiFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-VitalSignsApiFunctionArn'
+
+  AlertManagementFunctionArn:
+    Description: ARN of the Alert Management Lambda function
+    Value: !GetAtt AlertManagementFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertManagementFunctionArn'
+
+  PatientManagementFunctionName:
+    Description: Name of the Patient Management Lambda function
+    Value: !Ref PatientManagementFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-PatientManagementFunctionName'
+
+  VitalSignsApiFunctionName:
+    Description: Name of the Vital Signs API Lambda function
+    Value: !Ref VitalSignsApiFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-VitalSignsApiFunctionName'
+
+  AlertManagementFunctionName:
+    Description: Name of the Alert Management Lambda function
+    Value: !Ref AlertManagementFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertManagementFunctionName'

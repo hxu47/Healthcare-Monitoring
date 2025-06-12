@@ -1,0 +1,211 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Patient Vital Signs Monitoring - DynamoDB Tables for Healthcare Data'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: VitalSignsMonitoring
+    Description: Name of the project, used as prefix for resource names
+
+Resources:
+  # DynamoDB Table for Patient Records
+  PatientRecordsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-patient-records'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PatientId
+          AttributeType: S
+        - AttributeName: RoomNumber
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PatientId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: RoomIndex
+          KeySchema:
+            - AttributeName: RoomNumber
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: PatientData
+
+  # DynamoDB Table for Real-time Vital Signs
+  VitalSignsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-vital-signs'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PatientId
+          AttributeType: S
+        - AttributeName: Timestamp
+          AttributeType: S
+        - AttributeName: DeviceId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PatientId
+          KeyType: HASH
+        - AttributeName: Timestamp
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: DeviceIndex
+          KeySchema:
+            - AttributeName: DeviceId
+              KeyType: HASH
+            - AttributeName: Timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: TimestampIndex
+          KeySchema:
+            - AttributeName: Timestamp
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: TTL
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: VitalSigns
+
+  # DynamoDB Table for Alert Configuration
+  AlertConfigTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-alert-config'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PatientId
+          AttributeType: S
+        - AttributeName: VitalType
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PatientId
+          KeyType: HASH
+        - AttributeName: VitalType
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: AlertConfiguration
+
+  # DynamoDB Table for Alert History
+  AlertHistoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-alert-history'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: AlertId
+          AttributeType: S
+        - AttributeName: Timestamp
+          AttributeType: S
+        - AttributeName: PatientId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: AlertId
+          KeyType: HASH
+        - AttributeName: Timestamp
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: PatientAlertIndex
+          KeySchema:
+            - AttributeName: PatientId
+              KeyType: HASH
+            - AttributeName: Timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: TTL
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: AlertHistory
+
+Outputs:
+  PatientRecordsTableName:
+    Description: Name of the Patient Records DynamoDB table
+    Value: !Ref PatientRecordsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-PatientRecordsTableName'
+
+  PatientRecordsTableArn:
+    Description: ARN of the Patient Records DynamoDB table
+    Value: !GetAtt PatientRecordsTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-PatientRecordsTableArn'
+
+  VitalSignsTableName:
+    Description: Name of the Vital Signs DynamoDB table
+    Value: !Ref VitalSignsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-VitalSignsTableName'
+
+  VitalSignsTableArn:
+    Description: ARN of the Vital Signs DynamoDB table
+    Value: !GetAtt VitalSignsTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-VitalSignsTableArn'
+
+  VitalSignsTableStreamArn:
+    Description: Stream ARN of the Vital Signs DynamoDB table
+    Value: !GetAtt VitalSignsTable.StreamArn
+    Export:
+      Name: !Sub '${AWS::StackName}-VitalSignsTableStreamArn'
+
+  AlertConfigTableName:
+    Description: Name of the Alert Configuration DynamoDB table
+    Value: !Ref AlertConfigTable
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertConfigTableName'
+
+  AlertConfigTableArn:
+    Description: ARN of the Alert Configuration DynamoDB table
+    Value: !GetAtt AlertConfigTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertConfigTableArn'
+
+  AlertHistoryTableName:
+    Description: Name of the Alert History DynamoDB table
+    Value: !Ref AlertHistoryTable
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertHistoryTableName'
+
+  AlertHistoryTableArn:
+    Description: ARN of the Alert History DynamoDB table
+    Value: !GetAtt AlertHistoryTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertHistoryTableArn'

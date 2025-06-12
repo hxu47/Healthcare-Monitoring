@@ -1,0 +1,12 @@
+# Requirements for Patient Management Lambda Function
+# Handles CRUD operations for patient records
+
+boto3>=1.26.0
+botocore>=1.29.0
+
+# For JSON handling and datetime operations
+# (These are built into Python, but listing for clarity)
+# json - built-in
+# datetime - built-in
+# decimal - built-in
+# os - built-in

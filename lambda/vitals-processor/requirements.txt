@@ -1,0 +1,14 @@
+# Requirements for Vital Signs Processor Lambda Function
+# Processes real-time data from Kinesis streams, stores in DynamoDB, and sends alerts
+
+boto3>=1.26.0
+botocore>=1.29.0
+
+# For JSON handling and datetime operations
+# (These are built into Python, but listing for clarity)
+# json - built-in
+# datetime - built-in
+# decimal - built-in
+# uuid - built-in
+# base64 - built-in
+# os - built-in
