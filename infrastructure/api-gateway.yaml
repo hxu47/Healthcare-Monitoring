@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Patient Vital Signs Monitoring - API Gateway for Healthcare Dashboard'
+Description: 'Patient Vital Signs Monitoring - API Gateway for Healthcare Dashboard (CORS Fixed)'
 
 Parameters:
   ProjectName:
@@ -24,33 +24,6 @@ Resources:
       BinaryMediaTypes:
         - 'application/json'
         - 'application/octet-stream'
-
-  # CORS Options Method for API Gateway
-  CorsOptionsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref HealthcareApi
-      ResourceId: !GetAtt HealthcareApi.RootResourceId
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-            ResponseTemplates:
-              application/json: ''
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
 
   # Patients Resource
   PatientsResource:
@@ -83,6 +56,158 @@ Resources:
       RestApiId: !Ref HealthcareApi
       ParentId: !GetAtt HealthcareApi.RootResourceId
       PathPart: alerts
+
+  # Alert ID Resource
+  AlertIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ParentId: !Ref AlertsResource
+      PathPart: '{alertId}'
+
+  # Alert Acknowledge Resource
+  AlertAcknowledgeResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ParentId: !Ref AlertIdResource
+      PathPart: 'acknowledge'
+
+  # CORS OPTIONS Methods
+  # Root CORS
+  RootCorsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ResourceId: !GetAtt HealthcareApi.RootResourceId
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+            ResponseTemplates:
+              application/json: ''
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+
+  # Patients CORS
+  PatientsCorsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ResourceId: !Ref PatientsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+            ResponseTemplates:
+              application/json: ''
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+
+  # Patient ID CORS
+  PatientIdCorsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ResourceId: !Ref PatientIdResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+            ResponseTemplates:
+              application/json: ''
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+
+  # Vital Signs CORS
+  VitalSignsCorsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ResourceId: !Ref VitalSignsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+            ResponseTemplates:
+              application/json: ''
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+
+  # Alerts CORS
+  AlertsCorsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ResourceId: !Ref AlertsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+            ResponseTemplates:
+              application/json: ''
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
 
   # GET /patients method
   GetPatientsMethod:
@@ -148,6 +273,22 @@ Resources:
           - LambdaArn:
               Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionArn'
 
+  # DELETE /patients/{patientId} method
+  DeletePatientMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ResourceId: !Ref PatientIdResource
+      HttpMethod: DELETE
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
+          - LambdaArn:
+              Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionArn'
+
   # GET /vitalsigns method
   GetVitalSignsMethod:
     Type: AWS::ApiGateway::Method
@@ -171,6 +312,22 @@ Resources:
       RestApiId: !Ref HealthcareApi
       ResourceId: !Ref AlertsResource
       HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
+          - LambdaArn:
+              Fn::ImportValue: !Sub '${LambdaStackName}-AlertManagementFunctionArn'
+
+  # PUT /alerts/{alertId}/acknowledge method
+  PutAlertAcknowledgeMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ResourceId: !Ref AlertAcknowledgeResource
+      HttpMethod: PUT
       AuthorizationType: NONE
       Integration:
         Type: AWS_PROXY
@@ -216,9 +373,15 @@ Resources:
       - PostPatientsMethod
       - GetPatientMethod
       - PutPatientMethod
+      - DeletePatientMethod
       - GetVitalSignsMethod
       - GetAlertsMethod
-      - CorsOptionsMethod
+      - PutAlertAcknowledgeMethod
+      - RootCorsMethod
+      - PatientsCorsMethod
+      - PatientIdCorsMethod
+      - VitalSignsCorsMethod
+      - AlertsCorsMethod
     Properties:
       RestApiId: !Ref HealthcareApi
       StageName: prod

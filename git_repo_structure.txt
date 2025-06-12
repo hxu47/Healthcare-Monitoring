@@ -1,0 +1,40 @@
+.
+├── deploy.sh
+├── frontend
+│   ├── public
+│   │   └── index.html
+│   └── src
+│       ├── css
+│       │   └── styles.css
+│       └── js
+│           ├── api.js
+│           ├── app.js
+│           └── config.js
+├── git_repo_structure.txt
+├── infrastructure
+│   ├── api-gateway.yaml
+│   ├── cloudwatch.yaml
+│   ├── dynamodb.yaml
+│   ├── iot.yaml
+│   ├── lambda.yaml
+│   └── s3.yaml
+├── lambda
+│   ├── alert-management
+│   │   ├── lambda_function.py
+│   │   └── requirements.txt
+│   ├── iot-simulator
+│   │   ├── lambda_function.py
+│   │   └── requirements.txt
+│   ├── patient-management
+│   │   ├── lambda_function.py
+│   │   └── requirements.txt
+│   ├── vitals-api
+│   │   ├── lambda_function.py
+│   │   └── requirements.txt
+│   └── vitals-processor
+│       ├── lambda_function.py
+│       └── requirements.txt
+├── package-lambda.sh
+└── upload-frontend.sh
+
+12 directories, 25 files
