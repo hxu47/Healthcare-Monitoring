@@ -74,33 +74,6 @@ Resources:
       PathPart: 'acknowledge'
 
   # CORS OPTIONS Methods
-  # Root CORS
-  RootCorsMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref HealthcareApi
-      ResourceId: !GetAtt HealthcareApi.RootResourceId
-      HttpMethod: OPTIONS
-      AuthorizationType: NONE
-      Integration:
-        Type: MOCK
-        IntegrationResponses:
-          - StatusCode: 200
-            ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-            ResponseTemplates:
-              application/json: ''
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-
   # Patients CORS
   PatientsCorsMethod:
     Type: AWS::ApiGateway::Method
@@ -114,19 +87,17 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
               method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-            ResponseTemplates:
-              application/json: ''
+              method.response.header.Access-Control-Allow-Origin: "'*'"
         RequestTemplates:
           application/json: '{"statusCode": 200}'
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Allow-Headers: true
             method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
 
   # Patient ID CORS
   PatientIdCorsMethod:
@@ -141,19 +112,17 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
               method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-            ResponseTemplates:
-              application/json: ''
+              method.response.header.Access-Control-Allow-Origin: "'*'"
         RequestTemplates:
           application/json: '{"statusCode": 200}'
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Allow-Headers: true
             method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
 
   # Vital Signs CORS
   VitalSignsCorsMethod:
@@ -168,19 +137,17 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-            ResponseTemplates:
-              application/json: ''
         RequestTemplates:
           application/json: '{"statusCode": 200}'
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Allow-Headers: true
             method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
 
   # Alerts CORS
   AlertsCorsMethod:
@@ -195,19 +162,17 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,PUT,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
-            ResponseTemplates:
-              application/json: ''
         RequestTemplates:
           application/json: '{"statusCode": 200}'
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Allow-Headers: true
             method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
 
   # GET /patients method
   GetPatientsMethod:
@@ -224,6 +189,10 @@ Resources:
           - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
           - LambdaArn:
               Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionArn'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
 
   # POST /patients method
   PostPatientsMethod:
@@ -240,6 +209,10 @@ Resources:
           - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
           - LambdaArn:
               Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionArn'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
 
   # GET /patients/{patientId} method
   GetPatientMethod:
@@ -256,6 +229,10 @@ Resources:
           - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
           - LambdaArn:
               Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionArn'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
 
   # PUT /patients/{patientId} method
   PutPatientMethod:
@@ -272,6 +249,10 @@ Resources:
           - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
           - LambdaArn:
               Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionArn'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
 
   # DELETE /patients/{patientId} method
   DeletePatientMethod:
@@ -288,6 +269,10 @@ Resources:
           - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
           - LambdaArn:
               Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionArn'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
 
   # GET /vitalsigns method
   GetVitalSignsMethod:
@@ -304,6 +289,10 @@ Resources:
           - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
           - LambdaArn:
               Fn::ImportValue: !Sub '${LambdaStackName}-VitalSignsApiFunctionArn'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
 
   # GET /alerts method
   GetAlertsMethod:
@@ -320,6 +309,10 @@ Resources:
           - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
           - LambdaArn:
               Fn::ImportValue: !Sub '${LambdaStackName}-AlertManagementFunctionArn'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
 
   # PUT /alerts/{alertId}/acknowledge method
   PutAlertAcknowledgeMethod:
@@ -336,6 +329,10 @@ Resources:
           - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
           - LambdaArn:
               Fn::ImportValue: !Sub '${LambdaStackName}-AlertManagementFunctionArn'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
 
   # Lambda permissions for API Gateway
   PatientManagementLambdaPermission:
@@ -377,7 +374,6 @@ Resources:
       - GetVitalSignsMethod
       - GetAlertsMethod
       - PutAlertAcknowledgeMethod
-      - RootCorsMethod
       - PatientsCorsMethod
       - PatientIdCorsMethod
       - VitalSignsCorsMethod
