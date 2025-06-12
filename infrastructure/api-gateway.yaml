@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Patient Vital Signs Monitoring - API Gateway for Healthcare Dashboard (CORS Fixed)'
+Description: 'Patient Vital Signs Monitoring - API Gateway with Working CORS'
 
 Parameters:
   ProjectName:
@@ -21,9 +21,6 @@ Resources:
       EndpointConfiguration:
         Types:
           - REGIONAL
-      BinaryMediaTypes:
-        - 'application/json'
-        - 'application/octet-stream'
 
   # Patients Resource
   PatientsResource:
@@ -57,25 +54,8 @@ Resources:
       ParentId: !GetAtt HealthcareApi.RootResourceId
       PathPart: alerts
 
-  # Alert ID Resource
-  AlertIdResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref HealthcareApi
-      ParentId: !Ref AlertsResource
-      PathPart: '{alertId}'
-
-  # Alert Acknowledge Resource
-  AlertAcknowledgeResource:
-    Type: AWS::ApiGateway::Resource
-    Properties:
-      RestApiId: !Ref HealthcareApi
-      ParentId: !Ref AlertIdResource
-      PathPart: 'acknowledge'
-
-  # CORS OPTIONS Methods
-  # Patients CORS
-  PatientsCorsMethod:
+  # Enable CORS for /patients
+  PatientsOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref HealthcareApi
@@ -90,8 +70,11 @@ Resources:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
               method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
         RequestTemplates:
           application/json: '{"statusCode": 200}'
+        PassthroughBehavior: WHEN_NO_MATCH
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -99,8 +82,8 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # Patient ID CORS
-  PatientIdCorsMethod:
+  # Enable CORS for /patients/{patientId}
+  PatientIdOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref HealthcareApi
@@ -115,8 +98,11 @@ Resources:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
               method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
         RequestTemplates:
           application/json: '{"statusCode": 200}'
+        PassthroughBehavior: WHEN_NO_MATCH
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -124,8 +110,8 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # Vital Signs CORS
-  VitalSignsCorsMethod:
+  # Enable CORS for /vitalsigns
+  VitalSignsOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref HealthcareApi
@@ -140,8 +126,11 @@ Resources:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
               method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
         RequestTemplates:
           application/json: '{"statusCode": 200}'
+        PassthroughBehavior: WHEN_NO_MATCH
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -149,8 +138,8 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # Alerts CORS
-  AlertsCorsMethod:
+  # Enable CORS for /alerts
+  AlertsOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref HealthcareApi
@@ -163,10 +152,13 @@ Resources:
           - StatusCode: 200
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,PUT,OPTIONS'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
         RequestTemplates:
           application/json: '{"statusCode": 200}'
+        PassthroughBehavior: WHEN_NO_MATCH
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -185,10 +177,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub
-          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
-          - LambdaArn:
-              Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionArn'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaStackName}-patient-management/invocations"
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -205,10 +194,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub
-          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
-          - LambdaArn:
-              Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionArn'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaStackName}-patient-management/invocations"
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -225,10 +211,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub
-          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
-          - LambdaArn:
-              Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionArn'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaStackName}-patient-management/invocations"
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -245,30 +228,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub
-          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
-          - LambdaArn:
-              Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionArn'
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
-
-  # DELETE /patients/{patientId} method
-  DeletePatientMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref HealthcareApi
-      ResourceId: !Ref PatientIdResource
-      HttpMethod: DELETE
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub
-          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
-          - LambdaArn:
-              Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionArn'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaStackName}-patient-management/invocations"
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -285,10 +245,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub
-          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
-          - LambdaArn:
-              Fn::ImportValue: !Sub '${LambdaStackName}-VitalSignsApiFunctionArn'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaStackName}-vitals-api/invocations"
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -305,30 +262,7 @@ Resources:
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub
-          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
-          - LambdaArn:
-              Fn::ImportValue: !Sub '${LambdaStackName}-AlertManagementFunctionArn'
-      MethodResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Origin: true
-
-  # PUT /alerts/{alertId}/acknowledge method
-  PutAlertAcknowledgeMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      RestApiId: !Ref HealthcareApi
-      ResourceId: !Ref AlertAcknowledgeResource
-      HttpMethod: PUT
-      AuthorizationType: NONE
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub
-          - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
-          - LambdaArn:
-              Fn::ImportValue: !Sub '${LambdaStackName}-AlertManagementFunctionArn'
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaStackName}-alert-management/invocations"
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -338,8 +272,7 @@ Resources:
   PatientManagementLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName:
-        Fn::ImportValue: !Sub '${LambdaStackName}-PatientManagementFunctionName'
+      FunctionName: !Sub "${LambdaStackName}-patient-management"
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HealthcareApi}/*/*'
@@ -347,8 +280,7 @@ Resources:
   VitalSignsApiLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName:
-        Fn::ImportValue: !Sub '${LambdaStackName}-VitalSignsApiFunctionName'
+      FunctionName: !Sub "${LambdaStackName}-vitals-api"
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HealthcareApi}/*/*'
@@ -356,8 +288,7 @@ Resources:
   AlertManagementLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName:
-        Fn::ImportValue: !Sub '${LambdaStackName}-AlertManagementFunctionName'
+      FunctionName: !Sub "${LambdaStackName}-alert-management"
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HealthcareApi}/*/*'
@@ -370,21 +301,15 @@ Resources:
       - PostPatientsMethod
       - GetPatientMethod
       - PutPatientMethod
-      - DeletePatientMethod
       - GetVitalSignsMethod
       - GetAlertsMethod
-      - PutAlertAcknowledgeMethod
-      - PatientsCorsMethod
-      - PatientIdCorsMethod
-      - VitalSignsCorsMethod
-      - AlertsCorsMethod
+      - PatientsOptionsMethod
+      - PatientIdOptionsMethod
+      - VitalSignsOptionsMethod
+      - AlertsOptionsMethod
     Properties:
       RestApiId: !Ref HealthcareApi
       StageName: prod
-      StageDescription:
-        Description: 'Production stage for Patient Vital Signs Monitoring API'
-        Variables:
-          Stack: !Ref AWS::StackName
 
 Outputs:
   ApiGatewayUrl:
@@ -398,9 +323,3 @@ Outputs:
     Value: !Ref HealthcareApi
     Export:
       Name: !Sub '${AWS::StackName}-ApiGatewayId'
-
-  ApiGatewayArn:
-    Description: ARN of the API Gateway
-    Value: !Sub 'arn:aws:apigateway:${AWS::Region}::/restapis/${HealthcareApi}'
-    Export:
-      Name: !Sub '${AWS::StackName}-ApiGatewayArn'
