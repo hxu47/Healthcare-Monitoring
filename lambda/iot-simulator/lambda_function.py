@@ -10,11 +10,11 @@ import os
 
 # Initialize AWS clients
 dynamodb = boto3.resource('dynamodb')
-iot_client = boto3.client('iot-data')
+kinesis_client = boto3.client('kinesis')
 
 # Environment variables
-IOT_ENDPOINT = os.environ['IOT_ENDPOINT']
 PATIENT_RECORDS_TABLE = os.environ['PATIENT_RECORDS_TABLE']
+KINESIS_STREAM_NAME = "VitalSignsMonitoring-vital-signs-stream"
 
 # Get DynamoDB table
 patient_table = dynamodb.Table(PATIENT_RECORDS_TABLE)
@@ -22,7 +22,8 @@ patient_table = dynamodb.Table(PATIENT_RECORDS_TABLE)
 def lambda_handler(event, context):
     """
     Lambda function to simulate IoT sensor data for patient vital signs.
-    This function generates realistic vital signs data and publishes it to IoT Core.
+    This function generates realistic vital signs data and sends it directly to Kinesis.
+    Fixed version that bypasses IoT Core publishing issues.
     """
     
     try:
@@ -34,23 +35,39 @@ def lambda_handler(event, context):
             create_sample_patients()
             patients = get_active_patients()
         
-        # Generate and publish vital signs for each patient
+        records_sent = 0
+        alerts_generated = 0
+        
+        # Generate and send vital signs for each patient
         for patient in patients:
             patient_id = patient['PatientId']
             
             # Generate realistic vital signs based on patient condition
             vital_signs = generate_vital_signs(patient)
             
-            # Publish to IoT Core
-            publish_to_iot(patient_id, vital_signs)
+            # Send directly to Kinesis (bypassing IoT Core)
+            success = send_to_kinesis(patient_id, vital_signs)
             
-            print(f"Generated vital signs for patient {patient_id}: {vital_signs}")
+            if success:
+                records_sent += 1
+                print(f"✅ Generated vital signs for patient {patient_id}: {vital_signs}")
+                
+                # Check if this would generate an alert
+                patient_status = determine_patient_status(vital_signs)
+                if patient_status in ['Critical', 'Warning']:
+                    alerts_generated += 1
+            else:
+                print(f"❌ Failed to send vital signs for patient {patient_id}")
         
         return {
             'statusCode': 200,
             'body': json.dumps({
-                'message': f'Successfully generated vital signs for {len(patients)} patients',
-                'patients_processed': len(patients)
+                'message': f'Successfully sent vital signs for {records_sent} patients to Kinesis',
+                'patients_processed': len(patients),
+                'records_sent': records_sent,
+                'alerts_generated': alerts_generated,
+                'method': 'direct_kinesis',
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
             })
         }
         
@@ -59,7 +76,8 @@ def lambda_handler(event, context):
         return {
             'statusCode': 500,
             'body': json.dumps({
-                'error': str(e)
+                'error': str(e),
+                'method': 'direct_kinesis'
             })
         }
 
@@ -183,10 +201,11 @@ def generate_vital_signs(patient):
     timestamp = datetime.utcnow().isoformat() + 'Z'
     
     # Generate device ID (simulating multiple sensors per patient)
-    device_types = ['monitor-1', 'monitor-2', 'pulse-ox', 'bp-cuff']
+    device_types = ['monitor-1', 'monitor-2', 'pulse-ox', 'bp-cuff', 'telemetry']
     device_id = f"{patient['PatientId']}-{random.choice(device_types)}"
     
     return {
+        'patientId': patient['PatientId'],
         'deviceId': device_id,
         'timestamp': timestamp,
         'heartRate': int(heart_rate),
@@ -202,55 +221,59 @@ def generate_vital_signs(patient):
         'dataQuality': random.choice(['Excellent', 'Good', 'Fair'])
     }
 
-def publish_to_iot(patient_id, vital_signs):
-    """Publish vital signs data to IoT Core"""
-    
-    topic = f"vitalsigns/{patient_id}/data"
-    
-    # Add patient ID to the payload
-    payload = {
-        'patientId': patient_id,
-        **vital_signs
-    }
+def send_to_kinesis(patient_id, vital_signs):
+    """Send vital signs data directly to Kinesis"""
     
     try:
-        response = iot_client.publish(
-            topic=topic,
-            qos=1,
-            payload=json.dumps(payload, default=str)
+        # Create the payload
+        payload = json.dumps(vital_signs, default=str)
+        
+        # Send to Kinesis
+        response = kinesis_client.put_record(
+            StreamName=KINESIS_STREAM_NAME,
+            Data=payload,
+            PartitionKey=patient_id
         )
-        print(f"Published to IoT topic {topic}: {response}")
+        
+        print(f"Sent to Kinesis - ShardId: {response.get('ShardId')}, SequenceNumber: {response.get('SequenceNumber')[:20]}...")
+        return True
         
     except Exception as e:
-        print(f"Error publishing to IoT Core: {str(e)}")
-        # For demo purposes, also log to CloudWatch if IoT publish fails
-        print(f"VITAL_SIGNS_DATA: {json.dumps(payload, default=str)}")
+        print(f"Error sending to Kinesis: {str(e)}")
+        return False
 
 def determine_patient_status(vital_signs):
     """Determine patient status based on vital signs"""
     
-    heart_rate = vital_signs['heartRate']
-    systolic_bp = vital_signs['systolicBP']
-    temperature = vital_signs['temperature']
-    oxygen_sat = vital_signs['oxygenSaturation']
-    
-    critical_conditions = [
-        heart_rate > 120 or heart_rate < 50,
-        systolic_bp > 180 or systolic_bp < 90,
-        temperature > 101.5 or temperature < 95.0,
-        oxygen_sat < 90
-    ]
-    
-    warning_conditions = [
-        heart_rate > 100 or heart_rate < 60,
-        systolic_bp > 140 or systolic_bp < 100,
-        temperature > 99.5 or temperature < 97.0,
-        oxygen_sat < 95
-    ]
-    
-    if any(critical_conditions):
-        return 'Critical'
-    elif any(warning_conditions):
-        return 'Warning'
-    else:
-        return 'Normal'
+    try:
+        heart_rate = float(vital_signs.get('heartRate', 0))
+        systolic_bp = float(vital_signs.get('systolicBP', 0))
+        temperature = float(vital_signs.get('temperature', 0))
+        oxygen_sat = float(vital_signs.get('oxygenSaturation', 0))
+        
+        # Critical conditions (require immediate attention)
+        critical_conditions = [
+            heart_rate > 120 or heart_rate < 50,
+            systolic_bp > 180 or systolic_bp < 90,
+            temperature > 101.5 or temperature < 95.0,
+            oxygen_sat < 90
+        ]
+        
+        # Warning conditions (require monitoring)
+        warning_conditions = [
+            heart_rate > 100 or heart_rate < 60,
+            systolic_bp > 140 or systolic_bp < 100,
+            temperature > 99.5 or temperature < 97.0,
+            oxygen_sat < 95
+        ]
+        
+        if any(critical_conditions):
+            return 'Critical'
+        elif any(warning_conditions):
+            return 'Warning'
+        else:
+            return 'Normal'
+            
+    except Exception as e:
+        print(f"Error determining patient status: {str(e)}")
+        return 'Unknown'
