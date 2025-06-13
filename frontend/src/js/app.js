@@ -86,8 +86,8 @@
                 self.updatePatientsTable();
                 self.updatePatientSelect();
                 
-                // Load recent alerts
-                return self.api.getRecentAlerts(1);
+                // Load recent alerts (get more hours to show more alerts)
+                return self.api.getRecentAlerts(24); // Get last 24 hours instead of 1 hour
                 
             }).then(function(alertsResponse) {
                 console.log('Alerts response:', alertsResponse);
@@ -95,11 +95,37 @@
                 self.alerts = alertsResponse.alerts || [];
                 self.updateAlertsDisplay();
                 
+                console.log('Loaded', self.alerts.length, 'alerts from last 24 hours');
+                
                 if (self.alerts.length === 0) {
-                    self.showSystemStatus('No recent alerts. System monitoring normally.', 'info');
+                    self.showSystemStatus('No alerts in last 24 hours. System monitoring normally.', 'info');
+                } else {
+                    self.showSystemStatus('Found ' + self.alerts.length + ' alerts in system', 'info');
                 }
                 
                 resolve();
+                
+            }).catch(function(error) {
+                console.error('API error:', error);
+                self.showSystemStatus('API connection error: ' + error.message, 'error');
+                reject(error);
+            });
+        });
+    };
+
+    // Manual trigger for IoT simulator (for testing)
+    HealthcareDashboard.prototype.triggerDataGeneration = function() {
+        var self = this;
+        
+        self.showSystemStatus('Triggering IoT data generation...', 'info');
+        
+        // This would call the IoT simulator Lambda function directly
+        // For now, we'll just refresh data
+        setTimeout(function() {
+            self.refreshData();
+            self.showSystemStatus('Data generation triggered. Check back in a moment for new data.', 'success');
+        }, 2000);
+    };
                 
             }).catch(function(error) {
                 console.error('API error:', error);
@@ -184,7 +210,7 @@
                 '<div class="list-group-item text-center text-muted">' +
                 '<i class="fas fa-shield-alt fa-2x mb-2"></i>' +
                 '<p class="mb-0">No recent alerts</p>' +
-                '<small class="text-muted">System monitoring normally</small>' +
+                '<small class="text-muted">Alerts will appear when vital signs exceed thresholds</small>' +
                 '</div></div>';
             return;
         }
@@ -792,6 +818,10 @@
 
     window.acknowledgeAlert = function(alertId) {
         if (healthcareDashboard) healthcareDashboard.acknowledgeAlert(alertId);
+    };
+
+    window.triggerDataGeneration = function() {
+        if (healthcareDashboard) healthcareDashboard.triggerDataGeneration();
     };
     
     // Initialize when DOM is ready

@@ -172,7 +172,7 @@
             
             Promise.all([
                 self.getAllPatients(),
-                self.getRecentAlerts(1)
+                self.getRecentAlerts(24) // Get alerts from last 24 hours
             ]).then(function(responses) {
                 var patientsResponse = responses[0];
                 var alertsResponse = responses[1];
