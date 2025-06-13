@@ -1,16 +1,35 @@
 // API Service for Patient Vital Signs Monitoring System
+// Real API calls only - no mock data
 
-class HealthcareAPI {
-    constructor() {
-        this.baseURL = window.HEALTHCARE_CONFIG?.API_BASE_URL || '';
-        this.endpoints = window.HEALTHCARE_CONFIG?.ENDPOINTS || {};
+(function() {
+    'use strict';
+    
+    // Healthcare API Constructor Function
+    function HealthcareAPI() {
+        this.baseURL = '';
+        this.endpoints = {
+            PATIENTS: '/patients',
+            VITAL_SIGNS: '/vitalsigns',
+            ALERTS: '/alerts'
+        };
+        
+        // Get config from window
+        if (window.HEALTHCARE_CONFIG) {
+            this.baseURL = window.HEALTHCARE_CONFIG.API_BASE_URL || '';
+            this.endpoints = window.HEALTHCARE_CONFIG.ENDPOINTS || this.endpoints;
+        }
+        
+        console.log('HealthcareAPI initialized with baseURL:', this.baseURL);
     }
 
     // Generic API request method
-    async makeRequest(endpoint, options = {}) {
-        const url = `${this.baseURL}${endpoint}`;
+    HealthcareAPI.prototype.makeRequest = function(endpoint, options) {
+        var self = this;
+        options = options || {};
         
-        const defaultOptions = {
+        var url = this.baseURL + endpoint;
+        
+        var defaultOptions = {
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
@@ -18,179 +37,215 @@ class HealthcareAPI {
             mode: 'cors'
         };
 
-        const requestOptions = { ...defaultOptions, ...options };
-
-        try {
-            console.log(`Making request to: ${url}`, requestOptions);
-            
-            const response = await fetch(url, requestOptions);
-            
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            console.log(`Response from ${endpoint}:`, data);
-            return data;
-
-        } catch (error) {
-            console.error(`API Error for ${endpoint}:`, error);
-            
-            // Handle network errors
-            if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                throw new Error('Network error: Unable to connect to the healthcare system. Please check your connection.');
-            }
-            
-            throw error;
+        // Merge options
+        var requestOptions = {};
+        for (var key in defaultOptions) {
+            requestOptions[key] = defaultOptions[key];
         }
-    }
+        for (var key in options) {
+            if (key === 'headers') {
+                requestOptions.headers = {};
+                for (var headerKey in defaultOptions.headers) {
+                    requestOptions.headers[headerKey] = defaultOptions.headers[headerKey];
+                }
+                for (var headerKey in options.headers) {
+                    requestOptions.headers[headerKey] = options.headers[headerKey];
+                }
+            } else {
+                requestOptions[key] = options[key];
+            }
+        }
+
+        return new Promise(function(resolve, reject) {
+            console.log('Making API request to:', url);
+            
+            // Check if fetch is available
+            if (typeof fetch === 'undefined') {
+                console.error('Fetch API not available');
+                reject(new Error('Fetch API not supported'));
+                return;
+            }
+            
+            fetch(url, requestOptions)
+                .then(function(response) {
+                    console.log('API response status:', response.status, 'for', endpoint);
+                    
+                    if (!response.ok) {
+                        return response.json().then(function(errorData) {
+                            throw new Error(errorData.error || 'HTTP ' + response.status + ': ' + response.statusText);
+                        }).catch(function() {
+                            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(function(data) {
+                    console.log('API response data for ' + endpoint + ':', data);
+                    resolve(data);
+                })
+                .catch(function(error) {
+                    console.error('API Error for ' + endpoint + ':', error);
+                    
+                    // Handle network errors
+                    if (error.name === 'TypeError' && error.message.indexOf('fetch') !== -1) {
+                        reject(new Error('Network error: Unable to connect to the healthcare system. Please check your connection.'));
+                    } else {
+                        reject(error);
+                    }
+                });
+        });
+    };
 
     // Patient Management API calls
-    async getAllPatients(roomNumber = null) {
-        const queryParams = roomNumber ? `?room=${encodeURIComponent(roomNumber)}` : '';
-        return await this.makeRequest(`${this.endpoints.PATIENTS}${queryParams}`);
-    }
+    HealthcareAPI.prototype.getAllPatients = function(roomNumber) {
+        var queryParams = roomNumber ? '?room=' + encodeURIComponent(roomNumber) : '';
+        return this.makeRequest(this.endpoints.PATIENTS + queryParams);
+    };
 
-    async getPatient(patientId) {
-        return await this.makeRequest(`${this.endpoints.PATIENTS}/${patientId}`);
-    }
+    HealthcareAPI.prototype.getPatient = function(patientId) {
+        return this.makeRequest(this.endpoints.PATIENTS + '/' + patientId);
+    };
 
-    async createPatient(patientData) {
-        return await this.makeRequest(this.endpoints.PATIENTS, {
+    HealthcareAPI.prototype.createPatient = function(patientData) {
+        return this.makeRequest(this.endpoints.PATIENTS, {
             method: 'POST',
             body: JSON.stringify(patientData)
         });
-    }
+    };
 
-    async updatePatient(patientId, updateData) {
-        return await this.makeRequest(`${this.endpoints.PATIENTS}/${patientId}`, {
+    HealthcareAPI.prototype.updatePatient = function(patientId, updateData) {
+        return this.makeRequest(this.endpoints.PATIENTS + '/' + patientId, {
             method: 'PUT',
             body: JSON.stringify(updateData)
         });
-    }
+    };
 
-    async deletePatient(patientId) {
-        return await this.makeRequest(`${this.endpoints.PATIENTS}/${patientId}`, {
+    HealthcareAPI.prototype.deletePatient = function(patientId) {
+        return this.makeRequest(this.endpoints.PATIENTS + '/' + patientId, {
             method: 'DELETE'
         });
-    }
+    };
 
     // Vital Signs API calls
-    async getVitalSigns(patientId = null, timeRange = '1h') {
-        let queryParams = `?timeRange=${timeRange}`;
+    HealthcareAPI.prototype.getVitalSigns = function(patientId, timeRange) {
+        var queryParams = '?timeRange=' + (timeRange || '1h');
         if (patientId) {
-            queryParams += `&patientId=${encodeURIComponent(patientId)}`;
+            queryParams += '&patientId=' + encodeURIComponent(patientId);
         }
-        return await this.makeRequest(`${this.endpoints.VITAL_SIGNS}${queryParams}`);
-    }
+        return this.makeRequest(this.endpoints.VITAL_SIGNS + queryParams);
+    };
 
-    async getLatestVitalSigns(patientId) {
-        return await this.makeRequest(`${this.endpoints.VITAL_SIGNS}?patientId=${patientId}&latest=true`);
-    }
+    HealthcareAPI.prototype.getLatestVitalSigns = function(patientId) {
+        return this.makeRequest(this.endpoints.VITAL_SIGNS + '?patientId=' + patientId + '&latest=true');
+    };
 
-    async getVitalSignsHistory(patientId, startTime, endTime) {
-        const queryParams = `?patientId=${patientId}&startTime=${startTime}&endTime=${endTime}`;
-        return await this.makeRequest(`${this.endpoints.VITAL_SIGNS}${queryParams}`);
-    }
+    HealthcareAPI.prototype.getVitalSignsHistory = function(patientId, startTime, endTime) {
+        var queryParams = '?patientId=' + patientId + '&startTime=' + startTime + '&endTime=' + endTime;
+        return this.makeRequest(this.endpoints.VITAL_SIGNS + queryParams);
+    };
 
     // Alert Management API calls
-    async getAllAlerts(limit = 50) {
-        return await this.makeRequest(`${this.endpoints.ALERTS}?limit=${limit}`);
-    }
+    HealthcareAPI.prototype.getAllAlerts = function(limit) {
+        return this.makeRequest(this.endpoints.ALERTS + '?limit=' + (limit || 50));
+    };
 
-    async getPatientAlerts(patientId, limit = 20) {
-        return await this.makeRequest(`${this.endpoints.ALERTS}?patientId=${patientId}&limit=${limit}`);
-    }
+    HealthcareAPI.prototype.getPatientAlerts = function(patientId, limit) {
+        return this.makeRequest(this.endpoints.ALERTS + '?patientId=' + patientId + '&limit=' + (limit || 20));
+    };
 
-    async getRecentAlerts(hours = 24) {
-        return await this.makeRequest(`${this.endpoints.ALERTS}?hours=${hours}`);
-    }
+    HealthcareAPI.prototype.getRecentAlerts = function(hours) {
+        return this.makeRequest(this.endpoints.ALERTS + '?hours=' + (hours || 24));
+    };
 
-    async acknowledgeAlert(alertId) {
-        return await this.makeRequest(`${this.endpoints.ALERTS}/${alertId}/acknowledge`, {
+    HealthcareAPI.prototype.acknowledgeAlert = function(alertId) {
+        return this.makeRequest(this.endpoints.ALERTS + '/' + alertId + '/acknowledge', {
             method: 'PUT'
         });
-    }
+    };
 
     // Dashboard and Analytics API calls
-    async getDashboardStats() {
-        try {
-            const [patientsResponse, alertsResponse] = await Promise.all([
-                this.getAllPatients(),
-                this.getRecentAlerts(1) // Last hour alerts
-            ]);
+    HealthcareAPI.prototype.getDashboardStats = function() {
+        var self = this;
+        
+        return new Promise(function(resolve, reject) {
+            console.log('Getting dashboard stats from APIs...');
+            
+            Promise.all([
+                self.getAllPatients(),
+                self.getRecentAlerts(1)
+            ]).then(function(responses) {
+                var patientsResponse = responses[0];
+                var alertsResponse = responses[1];
+                
+                var patients = patientsResponse.patients || [];
+                var alerts = alertsResponse.alerts || [];
 
-            const patients = patientsResponse.patients || [];
-            const alerts = alertsResponse.alerts || [];
+                // Calculate patient status distribution
+                var statusCounts = {
+                    total: patients.length,
+                    normal: 0,
+                    warning: 0,
+                    critical: 0,
+                    active: 0,
+                    inactive: 0
+                };
 
-            // Calculate patient status distribution
-            const statusCounts = {
-                total: patients.length,
-                normal: 0,
-                warning: 0,
-                critical: 0,
-                active: 0,
-                inactive: 0
-            };
+                for (var i = 0; i < patients.length; i++) {
+                    var patient = patients[i];
+                    var condition = (patient.Condition || 'normal').toLowerCase();
+                    
+                    if (condition === 'stable' || condition === 'normal') {
+                        statusCounts.normal++;
+                    } else if (condition === 'warning') {
+                        statusCounts.warning++;
+                    } else if (condition === 'critical') {
+                        statusCounts.critical++;
+                    }
 
-            patients.forEach(patient => {
-                // Count by condition
-                const condition = patient.Condition?.toLowerCase() || 'normal';
-                if (condition === 'stable' || condition === 'normal') {
-                    statusCounts.normal++;
-                } else if (condition === 'warning') {
-                    statusCounts.warning++;
-                } else if (condition === 'critical') {
-                    statusCounts.critical++;
+                    var status = (patient.Status || 'active').toLowerCase();
+                    if (status === 'active') {
+                        statusCounts.active++;
+                    } else {
+                        statusCounts.inactive++;
+                    }
                 }
 
-                // Count by status
-                const status = patient.Status?.toLowerCase() || 'active';
-                if (status === 'active') {
-                    statusCounts.active++;
-                } else {
-                    statusCounts.inactive++;
-                }
+                resolve({
+                    patients: statusCounts,
+                    recentAlerts: alerts.length,
+                    systemStatus: 'operational'
+                });
+                
+            }).catch(function(error) {
+                console.error('Error getting dashboard stats:', error);
+                reject(error);
             });
-
-            return {
-                patients: statusCounts,
-                recentAlerts: alerts.length,
-                systemStatus: 'operational'
-            };
-
-        } catch (error) {
-            console.error('Error getting dashboard stats:', error);
-            return {
-                patients: { total: 0, normal: 0, warning: 0, critical: 0, active: 0, inactive: 0 },
-                recentAlerts: 0,
-                systemStatus: 'error'
-            };
-        }
-    }
+        });
+    };
 
     // Health check for system status
-    async healthCheck() {
-        try {
-            // Simple health check by getting patients count
-            const response = await this.getAllPatients();
-            return {
-                status: 'healthy',
-                timestamp: new Date().toISOString(),
-                patientsCount: response.patients?.length || 0
-            };
-        } catch (error) {
-            return {
-                status: 'unhealthy',
-                timestamp: new Date().toISOString(),
-                error: error.message
-            };
-        }
-    }
+    HealthcareAPI.prototype.healthCheck = function() {
+        var self = this;
+        
+        return new Promise(function(resolve, reject) {
+            self.getAllPatients().then(function(response) {
+                resolve({
+                    status: 'healthy',
+                    timestamp: new Date().toISOString(),
+                    patientsCount: (response.patients || []).length
+                });
+            }).catch(function(error) {
+                resolve({
+                    status: 'unhealthy',
+                    timestamp: new Date().toISOString(),
+                    error: error.message
+                });
+            });
+        });
+    };
 
-    // Utility methods
-    formatPatientData(rawPatient) {
+    // Utility methods for data formatting
+    HealthcareAPI.prototype.formatPatientData = function(rawPatient) {
         return {
             PatientId: rawPatient.PatientId,
             Name: rawPatient.Name,
@@ -205,9 +260,9 @@ class HealthcareAPI {
             CurrentMedications: rawPatient.CurrentMedications || [],
             AdmissionDate: rawPatient.AdmissionDate || new Date().toISOString()
         };
-    }
+    };
 
-    formatVitalSigns(rawVitalSigns) {
+    HealthcareAPI.prototype.formatVitalSigns = function(rawVitalSigns) {
         return {
             PatientId: rawVitalSigns.PatientId,
             Timestamp: rawVitalSigns.Timestamp,
@@ -219,65 +274,17 @@ class HealthcareAPI {
             DeviceId: rawVitalSigns.DeviceId,
             RoomNumber: rawVitalSigns.RoomNumber
         };
+    };
+
+    // Create global API instance
+    window.healthcareAPI = new HealthcareAPI();
+    
+    // For debugging
+    console.log('HealthcareAPI loaded successfully - Real data mode');
+
+    // Export for module usage if needed
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = HealthcareAPI;
     }
 
-    // Mock data for development/demo purposes
-    generateMockVitalSigns(patientId) {
-        const now = new Date();
-        const mockData = [];
-
-        for (let i = 0; i < 20; i++) {
-            const timestamp = new Date(now.getTime() - (i * 30000)); // 30 second intervals
-            mockData.unshift({
-                PatientId: patientId,
-                Timestamp: timestamp.toISOString(),
-                HeartRate: 70 + Math.random() * 30,
-                SystolicBP: 120 + Math.random() * 20,
-                DiastolicBP: 80 + Math.random() * 15,
-                Temperature: 98.6 + (Math.random() - 0.5) * 2,
-                OxygenSaturation: 96 + Math.random() * 4,
-                DeviceId: `${patientId}-monitor`,
-                RoomNumber: 'ICU-101'
-            });
-        }
-
-        return mockData;
-    }
-
-    generateMockAlerts() {
-        const alertTypes = ['CRITICAL', 'WARNING', 'INFO'];
-        const patientIds = ['PATIENT-001', 'PATIENT-002', 'PATIENT-003'];
-        const messages = [
-            'Heart rate above threshold',
-            'Blood pressure critically high',
-            'Oxygen saturation below normal',
-            'Temperature spike detected',
-            'Irregular vital signs pattern'
-        ];
-
-        const mockAlerts = [];
-        const now = new Date();
-
-        for (let i = 0; i < 10; i++) {
-            const timestamp = new Date(now.getTime() - (i * 300000)); // 5 minute intervals
-            mockAlerts.push({
-                AlertId: `ALERT-${Date.now()}-${i}`,
-                PatientId: patientIds[Math.floor(Math.random() * patientIds.length)],
-                AlertType: alertTypes[Math.floor(Math.random() * alertTypes.length)],
-                Message: messages[Math.floor(Math.random() * messages.length)],
-                Timestamp: timestamp.toISOString(),
-                Status: Math.random() > 0.3 ? 'SENT' : 'ACKNOWLEDGED'
-            });
-        }
-
-        return mockAlerts;
-    }
-}
-
-// Create global API instance
-window.healthcareAPI = new HealthcareAPI();
-
-// Export for module usage if needed
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = HealthcareAPI;
-}
+})();

@@ -1,7 +1,14 @@
 // Main Application for Patient Vital Signs Monitoring System
+// Real data only - no mock data
 
-class HealthcareDashboard {
-    constructor() {
+(function() {
+    'use strict';
+    
+    // Global variables
+    var healthcareDashboard;
+    
+    // Healthcare Dashboard Constructor Function
+    function HealthcareDashboard() {
         this.api = window.healthcareAPI;
         this.currentView = 'dashboard';
         this.selectedPatientId = null;
@@ -10,343 +17,221 @@ class HealthcareDashboard {
         this.patients = [];
         this.alerts = [];
         
-        // Initialize the application
+        // Bind methods to preserve 'this' context
+        this.init = this.init.bind(this);
+        this.loadInitialData = this.loadInitialData.bind(this);
+        this.refreshData = this.refreshData.bind(this);
+        
+        // Initialize
         this.init();
     }
-
-    async init() {
+    
+    // Initialize the dashboard
+    HealthcareDashboard.prototype.init = function() {
+        var self = this;
+        console.log('Initializing Healthcare Dashboard with real data...');
+        
         try {
-            this.showLoading();
-            await this.loadInitialData();
-            this.setupEventListeners();
-            this.startAutoRefresh();
-            this.showSystemStatus('System initialized successfully', 'success');
+            self.showLoading();
+            
+            // Check if API is available
+            if (!window.healthcareAPI) {
+                console.error('Healthcare API not available');
+                self.showSystemStatus('Healthcare API not available. Please check system configuration.', 'error');
+                return;
+            }
+            
+            // Load real data
+            self.loadInitialData().then(function() {
+                self.setupEventListeners();
+                self.startAutoRefresh();
+                self.showSystemStatus('Healthcare system connected successfully', 'success');
+            }).catch(function(error) {
+                console.error('Failed to load initial data:', error);
+                self.showSystemStatus('Failed to connect to healthcare system: ' + error.message, 'error');
+                self.setupEventListeners();
+            });
+            
         } catch (error) {
             console.error('Failed to initialize dashboard:', error);
-            this.showSystemStatus('Failed to initialize system: ' + error.message, 'error');
+            self.showSystemStatus('System initialization failed: ' + error.message, 'error');
         }
-    }
-
-    async loadInitialData() {
-        try {
-            // Load patients and dashboard stats
-            const [patientsResponse, statsResponse] = await Promise.all([
-                this.api.getAllPatients(),
-                this.api.getDashboardStats()
-            ]);
-
-            this.patients = patientsResponse.patients || [];
-            this.updateDashboardStats(statsResponse);
-            this.updatePatientsTable();
-            this.updatePatientSelect();
+    };
+    
+    // Load initial data from real APIs
+    HealthcareDashboard.prototype.loadInitialData = function() {
+        var self = this;
+        
+        return new Promise(function(resolve, reject) {
+            console.log('Loading data from healthcare APIs...');
             
-            // Load initial alerts
-            const alertsResponse = await this.api.getRecentAlerts(1);
-            this.alerts = alertsResponse.alerts || [];
-            this.updateAlertsDisplay();
-
-        } catch (error) {
-            console.error('Error loading initial data:', error);
-            // Use mock data for demo if API fails
-            this.loadMockData();
-        }
-    }
-
-    loadMockData() {
-        console.log('Loading mock data for demonstration...');
-        
-        // Mock patients data
-        this.patients = [
-            {
-                PatientId: 'PATIENT-001',
-                Name: 'John Smith',
-                Age: 45,
-                Gender: 'Male',
-                RoomNumber: 'ICU-101',
-                Status: 'Active',
-                Condition: 'Stable'
-            },
-            {
-                PatientId: 'PATIENT-002',
-                Name: 'Sarah Johnson',
-                Age: 67,
-                Gender: 'Female',
-                RoomNumber: 'ICU-102',
-                Status: 'Active',
-                Condition: 'Critical'
-            },
-            {
-                PatientId: 'PATIENT-003',
-                Name: 'Michael Brown',
-                Age: 32,
-                Gender: 'Male',
-                RoomNumber: 'WARD-201',
-                Status: 'Active',
-                Condition: 'Stable'
-            },
-            {
-                PatientId: 'PATIENT-004',
-                Name: 'Emily Davis',
-                Age: 28,
-                Gender: 'Female',
-                RoomNumber: 'WARD-202',
-                Status: 'Active',
-                Condition: 'Warning'
-            },
-            {
-                PatientId: 'PATIENT-005',
-                Name: 'Robert Wilson',
-                Age: 78,
-                Gender: 'Male',
-                RoomNumber: 'ICU-103',
-                Status: 'Active',
-                Condition: 'Critical'
-            }
-        ];
-
-        // Mock dashboard stats
-        this.updateDashboardStats({
-            patients: {
-                total: 5,
-                normal: 2,
-                warning: 1,
-                critical: 2
-            }
-        });
-
-        this.updatePatientsTable();
-        this.updatePatientSelect();
-        
-        // Mock alerts
-        this.alerts = this.api.generateMockAlerts();
-        this.updateAlertsDisplay();
-    }
-
-    setupEventListeners() {
-        // Navigation
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const view = e.target.getAttribute('onclick');
-                if (view) {
-                    eval(view); // Execute the onclick function
+            // Load patients and dashboard stats
+            Promise.all([
+                self.api.getAllPatients(),
+                self.api.getDashboardStats()
+            ]).then(function(responses) {
+                var patientsResponse = responses[0];
+                var statsResponse = responses[1];
+                
+                console.log('Patients response:', patientsResponse);
+                console.log('Stats response:', statsResponse);
+                
+                self.patients = patientsResponse.patients || [];
+                
+                if (self.patients.length === 0) {
+                    self.showSystemStatus('No patients found in system. IoT simulator may be starting up...', 'warning');
                 }
+                
+                self.updateDashboardStats(statsResponse);
+                self.updatePatientsTable();
+                self.updatePatientSelect();
+                
+                // Load recent alerts
+                return self.api.getRecentAlerts(1);
+                
+            }).then(function(alertsResponse) {
+                console.log('Alerts response:', alertsResponse);
+                
+                self.alerts = alertsResponse.alerts || [];
+                self.updateAlertsDisplay();
+                
+                if (self.alerts.length === 0) {
+                    self.showSystemStatus('No recent alerts. System monitoring normally.', 'info');
+                }
+                
+                resolve();
+                
+            }).catch(function(error) {
+                console.error('API error:', error);
+                self.showSystemStatus('API connection error: ' + error.message, 'error');
+                reject(error);
             });
         });
-
-        // Auto-refresh toggle
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'r' && e.ctrlKey) {
-                e.preventDefault();
-                this.refreshData();
-            }
-        });
-    }
-
-    startAutoRefresh() {
-        // Refresh data every 30 seconds
-        this.refreshInterval = setInterval(() => {
-            this.refreshData();
-        }, 30000);
-    }
-
-    stopAutoRefresh() {
-        if (this.refreshInterval) {
-            clearInterval(this.refreshInterval);
-            this.refreshInterval = null;
-        }
-    }
-
-    async refreshData() {
-        try {
-            if (this.currentView === 'dashboard') {
-                await this.loadInitialData();
-                
-                // Refresh chart if patient is selected
-                if (this.selectedPatientId) {
-                    await this.loadPatientVitalSigns(this.selectedPatientId);
-                }
-            }
-        } catch (error) {
-            console.error('Error refreshing data:', error);
-        }
-    }
-
-    // View Management
-    showDashboard() {
-        this.currentView = 'dashboard';
-        this.hideAllViews();
-        document.getElementById('dashboardView').style.display = 'block';
-        this.setActiveNavItem('Dashboard');
-        this.refreshData();
-    }
-
-    showPatients() {
-        this.currentView = 'patients';
-        this.hideAllViews();
-        document.getElementById('patientsView').style.display = 'block';
-        this.setActiveNavItem('Patients');
-        this.updateAllPatientsTable();
-    }
-
-    showAlerts() {
-        this.currentView = 'alerts';
-        this.hideAllViews();
-        document.getElementById('alertsView').style.display = 'block';
-        this.setActiveNavItem('Alerts');
-        this.loadAllAlerts();
-    }
-
-    hideAllViews() {
-        document.querySelectorAll('.view').forEach(view => {
-            view.style.display = 'none';
-        });
-    }
-
-    setActiveNavItem(activeText) {
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.classList.remove('active');
-            if (link.textContent.trim().includes(activeText)) {
-                link.classList.add('active');
-            }
-        });
-    }
-
-    // Dashboard Functions
-    updateDashboardStats(stats) {
-        const patients = stats.patients || {};
+    };
+    
+    // Update dashboard stats
+    HealthcareDashboard.prototype.updateDashboardStats = function(stats) {
+        var patients = stats.patients || {};
         
-        document.getElementById('totalPatients').textContent = patients.total || 0;
-        document.getElementById('normalPatients').textContent = patients.normal || 0;
-        document.getElementById('warningPatients').textContent = patients.warning || 0;
-        document.getElementById('criticalPatients').textContent = patients.critical || 0;
-    }
-
-    updatePatientsTable() {
-        const tbody = document.getElementById('patientsTableBody');
+        var totalEl = document.getElementById('totalPatients');
+        var normalEl = document.getElementById('normalPatients');
+        var warningEl = document.getElementById('warningPatients');
+        var criticalEl = document.getElementById('criticalPatients');
+        
+        if (totalEl) totalEl.textContent = patients.total || 0;
+        if (normalEl) normalEl.textContent = patients.normal || 0;
+        if (warningEl) warningEl.textContent = patients.warning || 0;
+        if (criticalEl) criticalEl.textContent = patients.critical || 0;
+    };
+    
+    // Update patients table
+    HealthcareDashboard.prototype.updatePatientsTable = function() {
+        var tbody = document.getElementById('patientsTableBody');
+        if (!tbody) return;
         
         if (!this.patients || this.patients.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="text-center text-muted">
-                        <i class="fas fa-users fa-2x mb-2"></i>
-                        <p class="mb-0">No patients found</p>
-                    </td>
-                </tr>
-            `;
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">' +
+                '<i class="fas fa-clock fa-2x mb-2"></i>' +
+                '<p class="mb-0">Waiting for patient data...</p>' +
+                '<small class="text-muted">IoT simulator generates data every 5 minutes</small>' +
+                '</td></tr>';
             return;
         }
 
-        tbody.innerHTML = this.patients.map(patient => `
-            <tr>
-                <td><strong>${patient.PatientId}</strong></td>
-                <td>${patient.Name}</td>
-                <td><span class="badge bg-info">${patient.RoomNumber}</span></td>
-                <td>
-                    <span class="status-badge status-${patient.Condition?.toLowerCase() || 'normal'}">
-                        ${patient.Condition || 'Normal'}
-                    </span>
-                </td>
-                <td><small class="text-muted">Just now</small></td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary me-1" 
-                            onclick="healthcareDashboard.selectPatientFromButton('${patient.PatientId}')">
-                        <i class="fas fa-chart-line"></i> Monitor
-                    </button>
-                    <button class="btn btn-sm btn-outline-info" 
-                            onclick="healthcareDashboard.showPatientDetails('${patient.PatientId}')">
-                        <i class="fas fa-info-circle"></i> Details
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    updateAllPatientsTable() {
-        const tbody = document.getElementById('allPatientsTableBody');
-        
-        if (!this.patients || this.patients.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="8" class="text-center text-muted">
-                        <i class="fas fa-users fa-2x mb-2"></i>
-                        <p class="mb-0">No patients found</p>
-                    </td>
-                </tr>
-            `;
-            return;
+        var html = '';
+        for (var i = 0; i < this.patients.length; i++) {
+            var patient = this.patients[i];
+            html += '<tr>' +
+                '<td><strong>' + patient.PatientId + '</strong></td>' +
+                '<td>' + patient.Name + '</td>' +
+                '<td><span class="badge bg-info">' + patient.RoomNumber + '</span></td>' +
+                '<td><span class="status-badge status-' + (patient.Condition || 'normal').toLowerCase() + '">' + (patient.Condition || 'Normal') + '</span></td>' +
+                '<td><small class="text-muted">Live</small></td>' +
+                '<td>' +
+                '<button class="btn btn-sm btn-outline-primary me-1" onclick="selectPatientFromButton(\'' + patient.PatientId + '\')">' +
+                '<i class="fas fa-chart-line"></i> Monitor</button>' +
+                '<button class="btn btn-sm btn-outline-info" onclick="showPatientDetails(\'' + patient.PatientId + '\')">' +
+                '<i class="fas fa-info-circle"></i> Details</button>' +
+                '</td>' +
+                '</tr>';
         }
-
-        tbody.innerHTML = this.patients.map(patient => `
-            <tr>
-                <td><strong>${patient.PatientId}</strong></td>
-                <td>${patient.Name}</td>
-                <td>${patient.Age}</td>
-                <td>${patient.Gender}</td>
-                <td><span class="badge bg-info">${patient.RoomNumber}</span></td>
-                <td>
-                    <span class="status-badge status-${patient.Status?.toLowerCase() || 'active'}">
-                        ${patient.Status || 'Active'}
-                    </span>
-                </td>
-                <td>
-                    <span class="status-badge status-${patient.Condition?.toLowerCase() || 'normal'}">
-                        ${patient.Condition || 'Normal'}
-                    </span>
-                </td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary me-1" 
-                            onclick="healthcareDashboard.showPatientDetails('${patient.PatientId}')">
-                        <i class="fas fa-edit"></i> Edit
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger" 
-                            onclick="healthcareDashboard.deletePatient('${patient.PatientId}')">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    updatePatientSelect() {
-        const select = document.getElementById('patientSelect');
+        tbody.innerHTML = html;
+    };
+    
+    // Update patient select dropdown
+    HealthcareDashboard.prototype.updatePatientSelect = function() {
+        var select = document.getElementById('patientSelect');
+        if (!select) return;
         
         select.innerHTML = '<option value="">Select Patient...</option>';
         
-        this.patients.forEach(patient => {
-            const option = document.createElement('option');
+        for (var i = 0; i < this.patients.length; i++) {
+            var patient = this.patients[i];
+            var option = document.createElement('option');
             option.value = patient.PatientId;
-            option.textContent = `${patient.Name} (${patient.RoomNumber})`;
+            option.textContent = patient.Name + ' (' + patient.RoomNumber + ')';
             select.appendChild(option);
-        });
-    }
+        }
+    };
+    
+    // Update alerts display
+    HealthcareDashboard.prototype.updateAlertsDisplay = function() {
+        var alertsList = document.getElementById('alertsList');
+        if (!alertsList) return;
+        
+        if (!this.alerts || this.alerts.length === 0) {
+            alertsList.innerHTML = '<div class="list-group list-group-flush">' +
+                '<div class="list-group-item text-center text-muted">' +
+                '<i class="fas fa-shield-alt fa-2x mb-2"></i>' +
+                '<p class="mb-0">No recent alerts</p>' +
+                '<small class="text-muted">System monitoring normally</small>' +
+                '</div></div>';
+            return;
+        }
 
-    // Fixed function: Handle patient selection from Monitor button
-    async selectPatientFromButton(patientId) {
-        // Switch to dashboard view if not already there
+        var alertsHtml = '';
+        var alertsToShow = this.alerts.slice(0, 10);
+        
+        for (var i = 0; i < alertsToShow.length; i++) {
+            var alert = alertsToShow[i];
+            alertsHtml += '<div class="list-group-item alert-item alert-' + (alert.AlertType || 'info').toLowerCase() + '">' +
+                '<div class="d-flex justify-content-between align-items-start">' +
+                '<div class="flex-grow-1">' +
+                '<h6 class="mb-1"><i class="fas fa-' + this.getAlertIcon(alert.AlertType) + ' me-1"></i>' + (alert.AlertType || 'Alert') + '</h6>' +
+                '<p class="mb-1">' + this.truncateMessage(alert.Message || 'No message', 60) + '</p>' +
+                '<small class="text-muted">' + alert.PatientId + ' • ' + this.formatTime(alert.Timestamp) + '</small>' +
+                '</div>' +
+                '<div class="flex-shrink-0"><small class="text-muted">' + (alert.Status || 'SENT') + '</small></div>' +
+                '</div></div>';
+        }
+        
+        alertsList.innerHTML = '<div class="list-group list-group-flush">' + alertsHtml + '</div>';
+    };
+    
+    // Select patient from button click
+    HealthcareDashboard.prototype.selectPatientFromButton = function(patientId) {
         if (this.currentView !== 'dashboard') {
             this.showDashboard();
         }
         
-        // Update dropdown selection
-        const select = document.getElementById('patientSelect');
-        select.value = patientId;
+        var select = document.getElementById('patientSelect');
+        if (select) select.value = patientId;
         
-        // Set selected patient and load data
         this.selectedPatientId = patientId;
-        await this.loadPatientVitalSigns(patientId);
+        this.loadPatientVitalSigns(patientId);
         
-        // Show success message
-        const patient = this.patients.find(p => p.PatientId === patientId);
+        var patient = this.getPatientById(patientId);
         if (patient) {
-            this.showSystemStatus(`Now monitoring ${patient.Name} (${patientId})`, 'success');
+            this.showSystemStatus('Now monitoring ' + patient.Name + ' (' + patientId + ')', 'success');
         }
-    }
-
-    // Fixed function: Handle dropdown selection
-    async selectPatient() {
-        const select = document.getElementById('patientSelect');
-        const patientId = select.value;
+    };
+    
+    // Select patient from dropdown
+    HealthcareDashboard.prototype.selectPatient = function() {
+        var select = document.getElementById('patientSelect');
+        if (!select) return;
+        
+        var patientId = select.value;
         
         if (!patientId) {
             this.selectedPatientId = null;
@@ -355,68 +240,72 @@ class HealthcareDashboard {
         }
 
         this.selectedPatientId = patientId;
-        await this.loadPatientVitalSigns(patientId);
-    }
-
-    async loadPatientVitalSigns(patientId) {
-        try {
-            this.showSystemStatus(`Loading vital signs for patient ${patientId}...`, 'info');
-            
-            // Try to get real data first, then fall back to mock data
-            let vitalSignsData;
-            
-            try {
-                const response = await this.api.getVitalSigns(patientId, '1h');
-                vitalSignsData = response.vitalSigns || [];
-                
-                // If no real data, generate mock data
-                if (vitalSignsData.length === 0) {
-                    console.log('No real data found, generating mock data for', patientId);
-                    vitalSignsData = this.api.generateMockVitalSigns(patientId);
-                }
-            } catch (error) {
-                console.log('API error, using mock data for vital signs:', error);
-                vitalSignsData = this.api.generateMockVitalSigns(patientId);
-            }
-
-            this.updateVitalSignsChart(vitalSignsData);
-            
-            const patient = this.patients.find(p => p.PatientId === patientId);
-            if (patient) {
-                this.showSystemStatus(`Displaying vital signs for ${patient.Name}`, 'success');
-            }
-            
-        } catch (error) {
-            console.error('Error loading vital signs:', error);
-            this.showSystemStatus('Error loading vital signs: ' + error.message, 'error');
-            
-            // Fallback to mock data
-            const mockData = this.api.generateMockVitalSigns(patientId);
-            this.updateVitalSignsChart(mockData);
-        }
-    }
-
-    updateVitalSignsChart(vitalSignsData) {
-        const ctx = document.getElementById('vitalSignsChart').getContext('2d');
+        this.loadPatientVitalSigns(patientId);
+    };
+    
+    // Load patient vital signs from real API
+    HealthcareDashboard.prototype.loadPatientVitalSigns = function(patientId) {
+        var self = this;
         
-        // Ensure we have data
+        console.log('Loading vital signs for patient:', patientId);
+        self.showSystemStatus('Loading vital signs for patient ' + patientId + '...', 'info');
+        
+        // Try to get real data from API
+        self.api.getVitalSigns(patientId, '1h').then(function(response) {
+            console.log('Vital signs response:', response);
+            
+            var vitalSignsData = response.vitalSigns || [];
+            
+            if (vitalSignsData.length === 0) {
+                self.showSystemStatus('No vital signs data found for this patient yet. Data generates every 5 minutes.', 'warning');
+                self.clearVitalSignsChart();
+                return;
+            }
+            
+            self.updateVitalSignsChart(vitalSignsData);
+            
+            var patient = self.getPatientById(patientId);
+            if (patient) {
+                self.showSystemStatus('Displaying ' + vitalSignsData.length + ' vital signs records for ' + patient.Name, 'success');
+            }
+            
+        }).catch(function(error) {
+            console.error('Error loading vital signs:', error);
+            self.showSystemStatus('Error loading vital signs: ' + error.message, 'error');
+            self.clearVitalSignsChart();
+        });
+    };
+    
+    // Update vital signs chart with real data
+    HealthcareDashboard.prototype.updateVitalSignsChart = function(vitalSignsData) {
+        var canvas = document.getElementById('vitalSignsChart');
+        if (!canvas) return;
+        
+        var ctx = canvas.getContext('2d');
+        
         if (!vitalSignsData || vitalSignsData.length === 0) {
             this.clearVitalSignsChart();
             return;
         }
         
-        // Prepare data for Chart.js
-        const labels = vitalSignsData.map(vs => {
-            const date = new Date(vs.Timestamp);
-            return date.toLocaleTimeString();
-        });
+        // Prepare data
+        var labels = [];
+        var heartRateData = [];
+        var systolicBPData = [];
+        var temperatureData = [];
+        var oxygenSatData = [];
+        
+        for (var i = 0; i < vitalSignsData.length; i++) {
+            var vs = vitalSignsData[i];
+            var date = new Date(vs.Timestamp);
+            labels.push(date.toLocaleTimeString());
+            heartRateData.push(vs.HeartRate);
+            systolicBPData.push(vs.SystolicBP);
+            temperatureData.push(vs.Temperature);
+            oxygenSatData.push(vs.OxygenSaturation);
+        }
 
-        const heartRateData = vitalSignsData.map(vs => vs.HeartRate);
-        const systolicBPData = vitalSignsData.map(vs => vs.SystolicBP);
-        const temperatureData = vitalSignsData.map(vs => vs.Temperature);
-        const oxygenSatData = vitalSignsData.map(vs => vs.OxygenSaturation);
-
-        // Destroy existing chart if it exists
+        // Destroy existing chart
         if (this.vitalSignsChart) {
             this.vitalSignsChart.destroy();
         }
@@ -464,38 +353,23 @@ class HealthcareDashboard {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                },
                 scales: {
                     x: {
                         display: true,
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
+                        title: { display: true, text: 'Time' }
                     },
                     y: {
                         type: 'linear',
                         display: true,
                         position: 'left',
-                        title: {
-                            display: true,
-                            text: 'Heart Rate / Blood Pressure'
-                        }
+                        title: { display: true, text: 'Heart Rate / Blood Pressure' }
                     },
                     y1: {
                         type: 'linear',
                         display: true,
                         position: 'right',
-                        title: {
-                            display: true,
-                            text: 'Temperature (°F)'
-                        },
-                        grid: {
-                            drawOnChartArea: false,
-                        },
+                        title: { display: true, text: 'Temperature (°F)' },
+                        grid: { drawOnChartArea: false }
                     },
                     y2: {
                         type: 'linear',
@@ -507,277 +381,207 @@ class HealthcareDashboard {
                 plugins: {
                     title: {
                         display: true,
-                        text: `Real-time Vital Signs - ${this.getPatientName(this.selectedPatientId)}`
+                        text: 'Real-time Vital Signs - ' + this.getPatientName(this.selectedPatientId)
                     },
-                    legend: {
-                        display: true,
-                        position: 'top'
-                    }
+                    legend: { display: true, position: 'top' }
                 }
             }
         });
         
-        console.log('Chart updated with', vitalSignsData.length, 'data points');
-    }
-
-    clearVitalSignsChart() {
+        console.log('Chart updated with', vitalSignsData.length, 'real data points');
+    };
+    
+    // Clear vital signs chart
+    HealthcareDashboard.prototype.clearVitalSignsChart = function() {
         if (this.vitalSignsChart) {
             this.vitalSignsChart.destroy();
             this.vitalSignsChart = null;
         }
         
-        const ctx = document.getElementById('vitalSignsChart').getContext('2d');
+        var canvas = document.getElementById('vitalSignsChart');
+        if (!canvas) return;
+        
+        var ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         ctx.font = '16px Arial';
         ctx.fillStyle = '#6c757d';
         ctx.textAlign = 'center';
         ctx.fillText('Select a patient to view vital signs', ctx.canvas.width / 2, ctx.canvas.height / 2);
-    }
-
-    // Alert Management
-    updateAlertsDisplay() {
-        const alertsList = document.getElementById('alertsList');
+        ctx.fillText('Data generates every 5 minutes', ctx.canvas.width / 2, ctx.canvas.height / 2 + 25);
+    };
+    
+    // Setup event listeners
+    HealthcareDashboard.prototype.setupEventListeners = function() {
+        var self = this;
         
-        if (!this.alerts || this.alerts.length === 0) {
-            alertsList.innerHTML = `
-                <div class="list-group list-group-flush">
-                    <div class="list-group-item text-center text-muted">
-                        <i class="fas fa-shield-alt fa-2x mb-2"></i>
-                        <p class="mb
-
-    async loadAllAlerts() {
-        try {
-            const response = await this.api.getAllAlerts(100);
-            const allAlerts = response.alerts || [];
-            
-            const alertsContainer = document.getElementById('allAlertsList');
-            
-            if (allAlerts.length === 0) {
-                alertsContainer.innerHTML = `
-                    <div class="text-center text-muted">
-                        <i class="fas fa-shield-alt fa-3x mb-3"></i>
-                        <h4>No Alerts Found</h4>
-                        <p>The system is running smoothly with no recent alerts.</p>
-                    </div>
-                `;
-                return;
+        // Auto-refresh
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'r' && e.ctrlKey) {
+                e.preventDefault();
+                self.refreshData();
             }
-
-            alertsContainer.innerHTML = allAlerts.map(alert => `
-                <div class="card mb-3 alert-item alert-${alert.AlertType?.toLowerCase() || 'info'}">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <h5 class="card-title">
-                                    <i class="fas fa-${this.getAlertIcon(alert.AlertType)} me-2"></i>
-                                    ${alert.AlertType || 'Alert'} - Patient ${alert.PatientId}
-                                </h5>
-                                <p class="card-text">${alert.Message || 'No message'}</p>
-                                <small class="text-muted">
-                                    <i class="fas fa-clock me-1"></i>
-                                    ${this.formatDateTime(alert.Timestamp)}
-                                </small>
-                            </div>
-                            <div class="text-end">
-                                <span class="badge bg-${this.getStatusBadgeColor(alert.Status)}">${alert.Status || 'SENT'}</span>
-                                ${alert.Status !== 'ACKNOWLEDGED' ? `
-                                    <button class="btn btn-sm btn-outline-primary mt-2" 
-                                            onclick="healthcareDashboard.acknowledgeAlert('${alert.AlertId}')">
-                                        <i class="fas fa-check"></i> Acknowledge
-                                    </button>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-
-        } catch (error) {
-            console.error('Error loading all alerts:', error);
-            // Use mock alerts
-            const mockAlerts = this.api.generateMockAlerts();
-            this.displayMockAlerts(mockAlerts);
-        }
-    }
-
-    async acknowledgeAlert(alertId) {
-        try {
-            await this.api.acknowledgeAlert(alertId);
-            this.showSystemStatus('Alert acknowledged successfully', 'success');
-            this.loadAllAlerts(); // Refresh the alerts list
-        } catch (error) {
-            console.error('Error acknowledging alert:', error);
-            this.showSystemStatus('Error acknowledging alert: ' + error.message, 'error');
-        }
-    }
-
-    // Patient Management
-    showAddPatientModal() {
-        const modal = new bootstrap.Modal(document.getElementById('addPatientModal'));
-        modal.show();
-    }
-
-    async addPatient() {
-        try {
-            const patientData = {
-                PatientId: document.getElementById('patientId').value,
-                Name: document.getElementById('patientName').value,
-                Age: parseInt(document.getElementById('patientAge').value),
-                Gender: document.getElementById('patientGender').value,
-                RoomNumber: document.getElementById('roomNumber').value,
-                Status: 'Active',
-                Condition: 'Stable'
-            };
-
-            await this.api.createPatient(patientData);
+        });
+    };
+    
+    // Start auto refresh
+    HealthcareDashboard.prototype.startAutoRefresh = function() {
+        var self = this;
+        
+        // Refresh every 30 seconds to get new data
+        this.refreshInterval = setInterval(function() {
+            console.log('Auto-refreshing data...');
+            self.refreshData();
+        }, 30000);
+        
+        console.log('Auto-refresh started (30 second intervals)');
+    };
+    
+    // Refresh data from APIs
+    HealthcareDashboard.prototype.refreshData = function() {
+        var self = this;
+        
+        if (this.currentView === 'dashboard') {
+            console.log('Refreshing dashboard data...');
             
-            // Close modal and refresh data
-            const modal = bootstrap.Modal.getInstance(document.getElementById('addPatientModal'));
-            modal.hide();
-            
-            this.showSystemStatus('Patient added successfully', 'success');
-            this.refreshData();
-            
-            // Clear form
-            document.getElementById('addPatientForm').reset();
-
-        } catch (error) {
-            console.error('Error adding patient:', error);
-            this.showSystemStatus('Error adding patient: ' + error.message, 'error');
+            this.loadInitialData().then(function() {
+                // Refresh chart if patient is selected
+                if (self.selectedPatientId) {
+                    self.loadPatientVitalSigns(self.selectedPatientId);
+                }
+            }).catch(function(error) {
+                console.error('Error refreshing data:', error);
+                self.showSystemStatus('Error refreshing data: ' + error.message, 'error');
+            });
         }
-    }
-
-    async showPatientDetails(patientId) {
-        try {
-            const response = await this.api.getPatient(patientId);
-            const patient = response;
-            
-            // Show patient details modal (you can implement this)
-            console.log('Show patient details for:', patient);
-            
-        } catch (error) {
-            console.error('Error loading patient details:', error);
-            this.showSystemStatus('Error loading patient details: ' + error.message, 'error');
+    };
+    
+    // View management
+    HealthcareDashboard.prototype.showDashboard = function() {
+        this.currentView = 'dashboard';
+        this.hideAllViews();
+        var dashboardView = document.getElementById('dashboardView');
+        if (dashboardView) dashboardView.style.display = 'block';
+        this.setActiveNavItem('Dashboard');
+        this.refreshData();
+    };
+    
+    HealthcareDashboard.prototype.hideAllViews = function() {
+        var views = document.querySelectorAll('.view');
+        for (var i = 0; i < views.length; i++) {
+            views[i].style.display = 'none';
         }
-    }
-
-    async deletePatient(patientId) {
-        if (!confirm('Are you sure you want to deactivate this patient?')) {
-            return;
+    };
+    
+    HealthcareDashboard.prototype.setActiveNavItem = function(activeText) {
+        var links = document.querySelectorAll('.nav-link');
+        for (var i = 0; i < links.length; i++) {
+            links[i].classList.remove('active');
+            if (links[i].textContent.indexOf(activeText) !== -1) {
+                links[i].classList.add('active');
+            }
         }
-
-        try {
-            await this.api.deletePatient(patientId);
-            this.showSystemStatus('Patient deactivated successfully', 'success');
-            this.refreshData();
-
-        } catch (error) {
-            console.error('Error deleting patient:', error);
-            this.showSystemStatus('Error deactivating patient: ' + error.message, 'error');
+    };
+    
+    // Utility functions
+    HealthcareDashboard.prototype.getPatientById = function(patientId) {
+        for (var i = 0; i < this.patients.length; i++) {
+            if (this.patients[i].PatientId === patientId) {
+                return this.patients[i];
+            }
         }
-    }
-
-    // Utility Functions
-    getPatientName(patientId) {
-        const patient = this.patients.find(p => p.PatientId === patientId);
+        return null;
+    };
+    
+    HealthcareDashboard.prototype.getPatientName = function(patientId) {
+        var patient = this.getPatientById(patientId);
         return patient ? patient.Name : 'Unknown Patient';
-    }
-
-    getAlertIcon(alertType) {
-        switch (alertType?.toLowerCase()) {
+    };
+    
+    HealthcareDashboard.prototype.getAlertIcon = function(alertType) {
+        switch ((alertType || '').toLowerCase()) {
             case 'critical': return 'exclamation-triangle';
             case 'warning': return 'exclamation-circle';
             case 'info': return 'info-circle';
             default: return 'bell';
         }
-    }
-
-    getStatusBadgeColor(status) {
-        switch (status?.toLowerCase()) {
-            case 'acknowledged': return 'success';
-            case 'sent': return 'primary';
-            default: return 'secondary';
-        }
-    }
-
-    formatTime(timestamp) {
+    };
+    
+    HealthcareDashboard.prototype.formatTime = function(timestamp) {
         if (!timestamp) return 'Unknown';
-        const date = new Date(timestamp);
+        var date = new Date(timestamp);
         return date.toLocaleTimeString();
-    }
-
-    formatDateTime(timestamp) {
-        if (!timestamp) return 'Unknown';
-        const date = new Date(timestamp);
-        return date.toLocaleString();
-    }
-
-    truncateMessage(message, maxLength) {
+    };
+    
+    HealthcareDashboard.prototype.truncateMessage = function(message, maxLength) {
         if (!message || message.length <= maxLength) return message;
         return message.substring(0, maxLength) + '...';
-    }
-
-    showSystemStatus(message, type = 'info') {
-        const statusElement = document.getElementById('statusMessage');
-        const alertElement = document.getElementById('systemStatus');
+    };
+    
+    HealthcareDashboard.prototype.showSystemStatus = function(message, type) {
+        var statusElement = document.getElementById('statusMessage');
+        var alertElement = document.getElementById('systemStatus');
+        
+        if (!statusElement || !alertElement) return;
         
         statusElement.textContent = message;
-        
-        // Remove existing classes
         alertElement.className = 'alert alert-dismissible fade show';
         
-        // Add appropriate class based on type
         switch (type) {
-            case 'success':
-                alertElement.classList.add('alert-success');
-                break;
-            case 'error':
-                alertElement.classList.add('alert-danger');
-                break;
-            case 'warning':
-                alertElement.classList.add('alert-warning');
-                break;
-            default:
-                alertElement.classList.add('alert-info');
+            case 'success': alertElement.classList.add('alert-success'); break;
+            case 'error': alertElement.classList.add('alert-danger'); break;
+            case 'warning': alertElement.classList.add('alert-warning'); break;
+            default: alertElement.classList.add('alert-info');
         }
         
         // Auto-hide after 5 seconds
-        setTimeout(() => {
-            alertElement.style.display = 'none';
+        setTimeout(function() {
+            if (alertElement.style.display !== 'none') {
+                alertElement.style.display = 'none';
+            }
         }, 5000);
+    };
+    
+    HealthcareDashboard.prototype.showLoading = function() {
+        this.showSystemStatus('Connecting to healthcare monitoring system...', 'info');
+    };
+    
+    // Global functions for onclick handlers
+    window.showDashboard = function() {
+        if (healthcareDashboard) healthcareDashboard.showDashboard();
+    };
+    
+    window.selectPatient = function() {
+        if (healthcareDashboard) healthcareDashboard.selectPatient();
+    };
+    
+    window.selectPatientFromButton = function(patientId) {
+        if (healthcareDashboard) healthcareDashboard.selectPatientFromButton(patientId);
+    };
+    
+    window.showPatientDetails = function(patientId) {
+        console.log('Show patient details for:', patientId);
+        if (healthcareDashboard) {
+            healthcareDashboard.showSystemStatus('Patient details feature coming soon', 'info');
+        }
+    };
+    
+    // Initialize when DOM is ready
+    function initializeDashboard() {
+        console.log('DOM loaded, initializing healthcare dashboard with real data...');
+        try {
+            healthcareDashboard = new HealthcareDashboard();
+            window.healthcareDashboard = healthcareDashboard;
+            console.log('Healthcare dashboard initialized successfully');
+        } catch (error) {
+            console.error('Failed to initialize dashboard:', error);
+        }
     }
-
-    showLoading() {
-        this.showSystemStatus('Loading healthcare monitoring system...', 'info');
+    
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeDashboard);
+    } else {
+        initializeDashboard();
     }
-}
-
-// Initialize the dashboard when the page loads
-document.addEventListener('DOMContentLoaded', () => {
-    window.healthcareDashboard = new HealthcareDashboard();
-});
-
-// Global functions for onclick handlers
-function showDashboard() {
-    window.healthcareDashboard.showDashboard();
-}
-
-function showPatients() {
-    window.healthcareDashboard.showPatients();
-}
-
-function showAlerts() {
-    window.healthcareDashboard.showAlerts();
-}
-
-function selectPatient() {
-    window.healthcareDashboard.selectPatient();
-}
-
-function showAddPatientModal() {
-    window.healthcareDashboard.showAddPatientModal();
-}
-
-function addPatient() {
-    window.healthcareDashboard.addPatient();
-}
+    
+})();
