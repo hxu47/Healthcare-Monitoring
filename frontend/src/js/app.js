@@ -464,6 +464,202 @@
         this.setActiveNavItem('Dashboard');
         this.refreshData();
     };
+
+    HealthcareDashboard.prototype.showPatients = function() {
+        this.currentView = 'patients';
+        this.hideAllViews();
+        var patientsView = document.getElementById('patientsView');
+        if (patientsView) patientsView.style.display = 'block';
+        this.setActiveNavItem('Patients');
+        this.updateAllPatientsTable();
+    };
+
+    HealthcareDashboard.prototype.showAlerts = function() {
+        this.currentView = 'alerts';
+        this.hideAllViews();
+        var alertsView = document.getElementById('alertsView');
+        if (alertsView) alertsView.style.display = 'block';
+        this.setActiveNavItem('Alerts');
+        this.loadAllAlerts();
+    };
+
+    // Update all patients table for patients view
+    HealthcareDashboard.prototype.updateAllPatientsTable = function() {
+        var tbody = document.getElementById('allPatientsTableBody');
+        if (!tbody) return;
+        
+        if (!this.patients || this.patients.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">' +
+                '<i class="fas fa-clock fa-2x mb-2"></i>' +
+                '<p class="mb-0">Waiting for patient data...</p>' +
+                '<small class="text-muted">IoT simulator generates data every 5 minutes</small>' +
+                '</td></tr>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < this.patients.length; i++) {
+            var patient = this.patients[i];
+            html += '<tr>' +
+                '<td><strong>' + patient.PatientId + '</strong></td>' +
+                '<td>' + patient.Name + '</td>' +
+                '<td>' + (patient.Age || 'N/A') + '</td>' +
+                '<td>' + (patient.Gender || 'N/A') + '</td>' +
+                '<td><span class="badge bg-info">' + patient.RoomNumber + '</span></td>' +
+                '<td><span class="status-badge status-' + (patient.Status || 'active').toLowerCase() + '">' + (patient.Status || 'Active') + '</span></td>' +
+                '<td><span class="status-badge status-' + (patient.Condition || 'normal').toLowerCase() + '">' + (patient.Condition || 'Normal') + '</span></td>' +
+                '<td>' +
+                '<button class="btn btn-sm btn-outline-primary me-1" onclick="showPatientDetails(\'' + patient.PatientId + '\')">' +
+                '<i class="fas fa-edit"></i> Edit</button>' +
+                '<button class="btn btn-sm btn-outline-danger" onclick="deletePatient(\'' + patient.PatientId + '\')">' +
+                '<i class="fas fa-trash"></i> Delete</button>' +
+                '</td>' +
+                '</tr>';
+        }
+        tbody.innerHTML = html;
+    };
+
+    // Load all alerts for alerts view
+    HealthcareDashboard.prototype.loadAllAlerts = function() {
+        var self = this;
+        
+        console.log('Loading all alerts...');
+        
+        self.api.getAllAlerts(100).then(function(response) {
+            var allAlerts = response.alerts || [];
+            var alertsContainer = document.getElementById('allAlertsList');
+            
+            if (!alertsContainer) return;
+            
+            if (allAlerts.length === 0) {
+                alertsContainer.innerHTML = '<div class="text-center text-muted">' +
+                    '<i class="fas fa-shield-alt fa-3x mb-3"></i>' +
+                    '<h4>No Alerts Found</h4>' +
+                    '<p>The system is running smoothly with no recent alerts.</p>' +
+                    '</div>';
+                return;
+            }
+
+            var alertsHtml = '';
+            for (var i = 0; i < allAlerts.length; i++) {
+                var alert = allAlerts[i];
+                alertsHtml += '<div class="card mb-3 alert-item alert-' + (alert.AlertType || 'info').toLowerCase() + '">' +
+                    '<div class="card-body">' +
+                    '<div class="d-flex justify-content-between align-items-start">' +
+                    '<div>' +
+                    '<h5 class="card-title">' +
+                    '<i class="fas fa-' + self.getAlertIcon(alert.AlertType) + ' me-2"></i>' +
+                    (alert.AlertType || 'Alert') + ' - Patient ' + alert.PatientId +
+                    '</h5>' +
+                    '<p class="card-text">' + (alert.Message || 'No message') + '</p>' +
+                    '<small class="text-muted">' +
+                    '<i class="fas fa-clock me-1"></i>' +
+                    self.formatDateTime(alert.Timestamp) +
+                    '</small>' +
+                    '</div>' +
+                    '<div class="text-end">' +
+                    '<span class="badge bg-' + self.getStatusBadgeColor(alert.Status) + '">' + (alert.Status || 'SENT') + '</span>' +
+                    (alert.Status !== 'ACKNOWLEDGED' ? 
+                        '<button class="btn btn-sm btn-outline-primary mt-2" onclick="acknowledgeAlert(\'' + alert.AlertId + '\')">' +
+                        '<i class="fas fa-check"></i> Acknowledge</button>' : '') +
+                    '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '</div>';
+            }
+            
+            alertsContainer.innerHTML = alertsHtml;
+
+        }).catch(function(error) {
+            console.error('Error loading all alerts:', error);
+            var alertsContainer = document.getElementById('allAlertsList');
+            if (alertsContainer) {
+                alertsContainer.innerHTML = '<div class="text-center text-muted">' +
+                    '<i class="fas fa-exclamation-triangle fa-3x mb-3"></i>' +
+                    '<h4>Error Loading Alerts</h4>' +
+                    '<p>Unable to load alerts: ' + error.message + '</p>' +
+                    '</div>';
+            }
+        });
+    };
+
+    // Patient management functions
+    HealthcareDashboard.prototype.showAddPatientModal = function() {
+        var modal = document.getElementById('addPatientModal');
+        if (modal && typeof bootstrap !== 'undefined') {
+            var bootstrapModal = new bootstrap.Modal(modal);
+            bootstrapModal.show();
+        }
+    };
+
+    HealthcareDashboard.prototype.addPatient = function() {
+        var self = this;
+        
+        try {
+            var patientData = {
+                PatientId: document.getElementById('patientId').value,
+                Name: document.getElementById('patientName').value,
+                Age: parseInt(document.getElementById('patientAge').value),
+                Gender: document.getElementById('patientGender').value,
+                RoomNumber: document.getElementById('roomNumber').value,
+                Status: 'Active',
+                Condition: 'Stable'
+            };
+
+            self.api.createPatient(patientData).then(function(response) {
+                // Close modal
+                var modal = document.getElementById('addPatientModal');
+                if (modal && typeof bootstrap !== 'undefined') {
+                    var bootstrapModal = bootstrap.Modal.getInstance(modal);
+                    if (bootstrapModal) bootstrapModal.hide();
+                }
+                
+                self.showSystemStatus('Patient added successfully', 'success');
+                self.refreshData();
+                
+                // Clear form
+                var form = document.getElementById('addPatientForm');
+                if (form) form.reset();
+
+            }).catch(function(error) {
+                console.error('Error adding patient:', error);
+                self.showSystemStatus('Error adding patient: ' + error.message, 'error');
+            });
+
+        } catch (error) {
+            console.error('Error in addPatient:', error);
+            self.showSystemStatus('Error adding patient: ' + error.message, 'error');
+        }
+    };
+
+    HealthcareDashboard.prototype.deletePatient = function(patientId) {
+        var self = this;
+        
+        if (!confirm('Are you sure you want to deactivate this patient?')) {
+            return;
+        }
+
+        self.api.deletePatient(patientId).then(function(response) {
+            self.showSystemStatus('Patient deactivated successfully', 'success');
+            self.refreshData();
+        }).catch(function(error) {
+            console.error('Error deleting patient:', error);
+            self.showSystemStatus('Error deactivating patient: ' + error.message, 'error');
+        });
+    };
+
+    // Alert management
+    HealthcareDashboard.prototype.acknowledgeAlert = function(alertId) {
+        var self = this;
+        
+        self.api.acknowledgeAlert(alertId).then(function(response) {
+            self.showSystemStatus('Alert acknowledged successfully', 'success');
+            self.loadAllAlerts(); // Refresh the alerts list
+        }).catch(function(error) {
+            console.error('Error acknowledging alert:', error);
+            self.showSystemStatus('Error acknowledging alert: ' + error.message, 'error');
+        });
+    };
     
     HealthcareDashboard.prototype.hideAllViews = function() {
         var views = document.querySelectorAll('.view');
@@ -512,9 +708,18 @@
         return date.toLocaleTimeString();
     };
     
-    HealthcareDashboard.prototype.truncateMessage = function(message, maxLength) {
-        if (!message || message.length <= maxLength) return message;
-        return message.substring(0, maxLength) + '...';
+    HealthcareDashboard.prototype.formatDateTime = function(timestamp) {
+        if (!timestamp) return 'Unknown';
+        var date = new Date(timestamp);
+        return date.toLocaleString();
+    };
+
+    HealthcareDashboard.prototype.getStatusBadgeColor = function(status) {
+        switch ((status || '').toLowerCase()) {
+            case 'acknowledged': return 'success';
+            case 'sent': return 'primary';
+            default: return 'secondary';
+        }
     };
     
     HealthcareDashboard.prototype.showSystemStatus = function(message, type) {
@@ -549,6 +754,14 @@
     window.showDashboard = function() {
         if (healthcareDashboard) healthcareDashboard.showDashboard();
     };
+
+    window.showPatients = function() {
+        if (healthcareDashboard) healthcareDashboard.showPatients();
+    };
+
+    window.showAlerts = function() {
+        if (healthcareDashboard) healthcareDashboard.showAlerts();
+    };
     
     window.selectPatient = function() {
         if (healthcareDashboard) healthcareDashboard.selectPatient();
@@ -563,6 +776,22 @@
         if (healthcareDashboard) {
             healthcareDashboard.showSystemStatus('Patient details feature coming soon', 'info');
         }
+    };
+
+    window.showAddPatientModal = function() {
+        if (healthcareDashboard) healthcareDashboard.showAddPatientModal();
+    };
+
+    window.addPatient = function() {
+        if (healthcareDashboard) healthcareDashboard.addPatient();
+    };
+
+    window.deletePatient = function(patientId) {
+        if (healthcareDashboard) healthcareDashboard.deletePatient(patientId);
+    };
+
+    window.acknowledgeAlert = function(alertId) {
+        if (healthcareDashboard) healthcareDashboard.acknowledgeAlert(alertId);
     };
     
     // Initialize when DOM is ready
