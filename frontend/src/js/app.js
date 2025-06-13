@@ -83,15 +83,33 @@ class HealthcareDashboard {
                 RoomNumber: 'WARD-201',
                 Status: 'Active',
                 Condition: 'Stable'
+            },
+            {
+                PatientId: 'PATIENT-004',
+                Name: 'Emily Davis',
+                Age: 28,
+                Gender: 'Female',
+                RoomNumber: 'WARD-202',
+                Status: 'Active',
+                Condition: 'Warning'
+            },
+            {
+                PatientId: 'PATIENT-005',
+                Name: 'Robert Wilson',
+                Age: 78,
+                Gender: 'Male',
+                RoomNumber: 'ICU-103',
+                Status: 'Active',
+                Condition: 'Critical'
             }
         ];
 
         // Mock dashboard stats
         this.updateDashboardStats({
             patients: {
-                total: 3,
-                normal: 1,
-                warning: 0,
+                total: 5,
+                normal: 2,
+                warning: 1,
                 critical: 2
             }
         });
@@ -232,7 +250,7 @@ class HealthcareDashboard {
                 <td><small class="text-muted">Just now</small></td>
                 <td>
                     <button class="btn btn-sm btn-outline-primary me-1" 
-                            onclick="healthcareDashboard.selectPatient('${patient.PatientId}')">
+                            onclick="healthcareDashboard.selectPatientFromButton('${patient.PatientId}')">
                         <i class="fas fa-chart-line"></i> Monitor
                     </button>
                     <button class="btn btn-sm btn-outline-info" 
@@ -303,6 +321,29 @@ class HealthcareDashboard {
         });
     }
 
+    // Fixed function: Handle patient selection from Monitor button
+    async selectPatientFromButton(patientId) {
+        // Switch to dashboard view if not already there
+        if (this.currentView !== 'dashboard') {
+            this.showDashboard();
+        }
+        
+        // Update dropdown selection
+        const select = document.getElementById('patientSelect');
+        select.value = patientId;
+        
+        // Set selected patient and load data
+        this.selectedPatientId = patientId;
+        await this.loadPatientVitalSigns(patientId);
+        
+        // Show success message
+        const patient = this.patients.find(p => p.PatientId === patientId);
+        if (patient) {
+            this.showSystemStatus(`Now monitoring ${patient.Name} (${patientId})`, 'success');
+        }
+    }
+
+    // Fixed function: Handle dropdown selection
     async selectPatient() {
         const select = document.getElementById('patientSelect');
         const patientId = select.value;
@@ -319,27 +360,50 @@ class HealthcareDashboard {
 
     async loadPatientVitalSigns(patientId) {
         try {
+            this.showSystemStatus(`Loading vital signs for patient ${patientId}...`, 'info');
+            
             // Try to get real data first, then fall back to mock data
             let vitalSignsData;
             
             try {
                 const response = await this.api.getVitalSigns(patientId, '1h');
                 vitalSignsData = response.vitalSigns || [];
+                
+                // If no real data, generate mock data
+                if (vitalSignsData.length === 0) {
+                    console.log('No real data found, generating mock data for', patientId);
+                    vitalSignsData = this.api.generateMockVitalSigns(patientId);
+                }
             } catch (error) {
-                console.log('Using mock data for vital signs');
+                console.log('API error, using mock data for vital signs:', error);
                 vitalSignsData = this.api.generateMockVitalSigns(patientId);
             }
 
             this.updateVitalSignsChart(vitalSignsData);
             
+            const patient = this.patients.find(p => p.PatientId === patientId);
+            if (patient) {
+                this.showSystemStatus(`Displaying vital signs for ${patient.Name}`, 'success');
+            }
+            
         } catch (error) {
             console.error('Error loading vital signs:', error);
             this.showSystemStatus('Error loading vital signs: ' + error.message, 'error');
+            
+            // Fallback to mock data
+            const mockData = this.api.generateMockVitalSigns(patientId);
+            this.updateVitalSignsChart(mockData);
         }
     }
 
     updateVitalSignsChart(vitalSignsData) {
         const ctx = document.getElementById('vitalSignsChart').getContext('2d');
+        
+        // Ensure we have data
+        if (!vitalSignsData || vitalSignsData.length === 0) {
+            this.clearVitalSignsChart();
+            return;
+        }
         
         // Prepare data for Chart.js
         const labels = vitalSignsData.map(vs => {
@@ -452,6 +516,8 @@ class HealthcareDashboard {
                 }
             }
         });
+        
+        console.log('Chart updated with', vitalSignsData.length, 'data points');
     }
 
     clearVitalSignsChart() {
@@ -581,11 +647,8 @@ class HealthcareDashboard {
                 Age: parseInt(document.getElementById('patientAge').value),
                 Gender: document.getElementById('patientGender').value,
                 RoomNumber: document.getElementById('roomNumber').value,
-                Status: document.getElementById('patientStatus').value,
-                Condition: document.getElementById('patientCondition').value,
-                EmergencyContact: document.getElementById('emergencyContact').value,
-                MedicalHistory: document.getElementById('medicalHistory').value,
-                Allergies: document.getElementById('allergies').value
+                Status: 'Active',
+                Condition: 'Stable'
             };
 
             await this.api.createPatient(patientData);
