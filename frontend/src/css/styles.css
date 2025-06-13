@@ -120,11 +120,21 @@ body {
     color: white;
 }
 
-/* Alerts */
+.status-stable {
+    background-color: var(--success-color);
+    color: white;
+}
+
+/* Alert Items */
 .alert-item {
     border-left: 4px solid;
     margin-bottom: 0.5rem;
     border-radius: 0 var(--border-radius) var(--border-radius) 0;
+    transition: var(--transition);
+}
+
+.alert-item:hover {
+    transform: translateX(2px);
 }
 
 .alert-critical {
@@ -140,6 +150,60 @@ body {
 .alert-info {
     border-left-color: var(--info-color);
     background-color: rgba(13, 202, 240, 0.1);
+}
+
+/* FIXED: Recent Alerts Section with Proper Height Control */
+.alerts-container {
+    max-height: 400px; /* Fixed maximum height */
+    overflow-y: auto; /* Enable scrolling */
+    padding-right: 0.5rem; /* Space for scrollbar */
+}
+
+.alerts-container .list-group {
+    max-height: none; /* Remove any height restrictions on list group */
+}
+
+.alerts-container .list-group-item {
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem; /* Slightly smaller text */
+    padding: 0.75rem; /* Reduced padding */
+}
+
+.alerts-container .list-group-item h6 {
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+
+.alerts-container .list-group-item p {
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.alerts-container .list-group-item small {
+    font-size: 0.75rem;
+}
+
+/* FIXED: Real-time Chart Container */
+.chart-container {
+    position: relative;
+    height: 400px !important; /* Force consistent height */
+    width: 100%;
+    min-height: 400px; /* Ensure minimum height */
+}
+
+#vitalSignsChart {
+    height: 400px !important;
+    max-height: 400px !important;
+    width: 100% !important;
+}
+
+/* FIXED: Dashboard Layout Grid Improvements */
+.dashboard-chart-section {
+    min-height: 500px; /* Ensure minimum height for chart section */
+}
+
+.dashboard-alerts-section {
+    max-height: 500px; /* Limit alerts section height */
 }
 
 /* Buttons */
@@ -182,17 +246,6 @@ body {
     border-bottom: 1px solid rgba(var(--bs-primary-rgb), 0.2);
 }
 
-/* Chart Container */
-.chart-container {
-    position: relative;
-    height: 400px;
-    width: 100%;
-}
-
-#vitalSignsChart {
-    max-height: 400px;
-}
-
 /* Loading States */
 .loading {
     opacity: 0.6;
@@ -218,7 +271,23 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-/* Responsive Design */
+/* FIXED: Responsive Design Improvements */
+@media (max-width: 1200px) {
+    .alerts-container {
+        max-height: 350px;
+    }
+    
+    .chart-container {
+        height: 350px !important;
+        min-height: 350px;
+    }
+    
+    #vitalSignsChart {
+        height: 350px !important;
+        max-height: 350px !important;
+    }
+}
+
 @media (max-width: 768px) {
     .container-fluid {
         padding-left: 1rem;
@@ -237,6 +306,22 @@ body {
     .modal-dialog {
         margin: 1rem;
     }
+    
+    /* Mobile: Stack chart and alerts vertically */
+    .alerts-container {
+        max-height: 300px;
+        margin-top: 1rem;
+    }
+    
+    .chart-container {
+        height: 300px !important;
+        min-height: 300px;
+    }
+    
+    #vitalSignsChart {
+        height: 300px !important;
+        max-height: 300px !important;
+    }
 }
 
 @media (max-width: 576px) {
@@ -251,6 +336,20 @@ body {
     .btn {
         padding: 0.5rem 1rem;
         font-size: 0.875rem;
+    }
+    
+    .alerts-container {
+        max-height: 250px;
+    }
+    
+    .chart-container {
+        height: 250px !important;
+        min-height: 250px;
+    }
+    
+    #vitalSignsChart {
+        height: 250px !important;
+        max-height: 250px !important;
     }
 }
 
@@ -296,7 +395,26 @@ footer small {
     font-weight: 500;
 }
 
-/* Custom Scrollbar */
+/* FIXED: Custom Scrollbar for Alerts */
+.alerts-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.alerts-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: var(--border-radius);
+}
+
+.alerts-container::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: var(--border-radius);
+}
+
+.alerts-container::-webkit-scrollbar-thumb:hover {
+    background: #0a58ca;
+}
+
+/* General Custom Scrollbar */
 ::-webkit-scrollbar {
     width: 8px;
 }
@@ -328,5 +446,10 @@ footer small {
     
     body {
         background-color: white;
+    }
+    
+    .alerts-container {
+        max-height: none;
+        overflow: visible;
     }
 }

@@ -540,32 +540,10 @@ class HealthcareDashboard {
         
         if (!this.alerts || this.alerts.length === 0) {
             alertsList.innerHTML = `
-                <div class="list-group-item text-center text-muted">
-                    <i class="fas fa-shield-alt fa-2x mb-2"></i>
-                    <p class="mb-0">No recent alerts</p>
-                </div>
-            `;
-            return;
-        }
-
-        alertsList.innerHTML = this.alerts.slice(0, 5).map(alert => `
-            <div class="list-group-item alert-item alert-${alert.AlertType?.toLowerCase() || 'info'}">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <h6 class="mb-1">
-                            <i class="fas fa-${this.getAlertIcon(alert.AlertType)} me-2"></i>
-                            ${alert.AlertType || 'Alert'}
-                        </h6>
-                        <p class="mb-1">${alert.Message || 'No message'}</p>
-                        <small class="text-muted">
-                            Patient: ${alert.PatientId} • ${this.formatTime(alert.Timestamp)}
-                        </small>
-                    </div>
-                    <small class="text-muted">${alert.Status || 'SENT'}</small>
-                </div>
-            </div>
-        `).join('');
-    }
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item text-center text-muted">
+                        <i class="fas fa-shield-alt fa-2x mb-2"></i>
+                        <p class="mb
 
     async loadAllAlerts() {
         try {
@@ -732,6 +710,11 @@ class HealthcareDashboard {
         if (!timestamp) return 'Unknown';
         const date = new Date(timestamp);
         return date.toLocaleString();
+    }
+
+    truncateMessage(message, maxLength) {
+        if (!message || message.length <= maxLength) return message;
+        return message.substring(0, maxLength) + '...';
     }
 
     showSystemStatus(message, type = 'info') {

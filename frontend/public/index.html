@@ -118,8 +118,8 @@
 
             <!-- Real-time Monitoring -->
             <div class="row">
-                <div class="col-lg-8">
-                    <div class="card">
+                <div class="col-lg-8 dashboard-chart-section">
+                    <div class="card h-100">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">
                                 <i class="fas fa-chart-line me-2"></i>Real-time Vital Signs
@@ -131,22 +131,26 @@
                             </div>
                         </div>
                         <div class="card-body">
-                            <canvas id="vitalSignsChart" height="400"></canvas>
+                            <div class="chart-container">
+                                <canvas id="vitalSignsChart"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-4">
-                    <div class="card">
+                <div class="col-lg-4 dashboard-alerts-section">
+                    <div class="card h-100">
                         <div class="card-header">
                             <h5 class="mb-0">
                                 <i class="fas fa-bell me-2"></i>Recent Alerts
                             </h5>
                         </div>
                         <div class="card-body p-0">
-                            <div id="alertsList" class="list-group list-group-flush">
-                                <div class="list-group-item text-center text-muted">
-                                    <i class="fas fa-shield-alt fa-2x mb-2"></i>
-                                    <p class="mb-0">No recent alerts</p>
+                            <div id="alertsList" class="alerts-container">
+                                <div class="list-group list-group-flush">
+                                    <div class="list-group-item text-center text-muted">
+                                        <i class="fas fa-shield-alt fa-2x mb-2"></i>
+                                        <p class="mb-0">No recent alerts</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
