@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Patient Vital Signs Monitoring - API Gateway with Working CORS'
+Description: 'Patient Vital Signs Monitoring - API Gateway with Complete CORS Support'
 
 Parameters:
   ProjectName:
@@ -54,6 +54,24 @@ Resources:
       ParentId: !GetAtt HealthcareApi.RootResourceId
       PathPart: alerts
 
+  # Alert ID Resource (NEW - for individual alert operations)
+  AlertIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ParentId: !Ref AlertsResource
+      PathPart: '{alertId}'
+
+  # Alert Acknowledge Resource (NEW - for acknowledge endpoint)
+  AlertAcknowledgeResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ParentId: !Ref AlertIdResource
+      PathPart: acknowledge
+
+  # CORS OPTIONS Methods
+  
   # Enable CORS for /patients
   PatientsOptionsMethod:
     Type: AWS::ApiGateway::Method
@@ -166,6 +184,64 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
+  # NEW: Enable CORS for /alerts/{alertId}
+  AlertIdOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ResourceId: !Ref AlertIdResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # NEW: Enable CORS for /alerts/{alertId}/acknowledge
+  AlertAcknowledgeOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ResourceId: !Ref AlertAcknowledgeResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'PUT,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        PassthroughBehavior: WHEN_NO_MATCH
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # API Methods
+
   # GET /patients method
   GetPatientsMethod:
     Type: AWS::ApiGateway::Method
@@ -268,6 +344,23 @@ Resources:
           ResponseParameters:
             method.response.header.Access-Control-Allow-Origin: true
 
+  # NEW: PUT /alerts/{alertId}/acknowledge method
+  PutAlertAcknowledgeMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      ResourceId: !Ref AlertAcknowledgeResource
+      HttpMethod: PUT
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LambdaStackName}-alert-management/invocations"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+
   # Lambda permissions for API Gateway
   PatientManagementLambdaPermission:
     Type: AWS::Lambda::Permission
@@ -303,10 +396,13 @@ Resources:
       - PutPatientMethod
       - GetVitalSignsMethod
       - GetAlertsMethod
+      - PutAlertAcknowledgeMethod
       - PatientsOptionsMethod
       - PatientIdOptionsMethod
       - VitalSignsOptionsMethod
       - AlertsOptionsMethod
+      - AlertIdOptionsMethod
+      - AlertAcknowledgeOptionsMethod
     Properties:
       RestApiId: !Ref HealthcareApi
       StageName: prod
