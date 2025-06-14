@@ -178,7 +178,7 @@
         }
     };
     
-    // Update alerts display
+    // Update alerts display 
     HealthcareDashboard.prototype.updateAlertsDisplay = function() {
         var alertsList = document.getElementById('alertsList');
         if (!alertsList) return;
@@ -194,22 +194,160 @@
         }
 
         var alertsHtml = '';
-        var alertsToShow = this.alerts.slice(0, 10);
+        var alertsToShow = this.alerts.slice(0, 8); // Show more alerts
         
         for (var i = 0; i < alertsToShow.length; i++) {
             var alert = alertsToShow[i];
-            alertsHtml += '<div class="list-group-item alert-item alert-' + (alert.AlertType || 'info').toLowerCase() + '">' +
+            var formattedMessage = this.formatAlertMessage(alert);
+            var alertTime = this.formatAlertTime(alert.Timestamp);
+            var patientName = this.getPatientNameForAlert(alert.PatientId);
+            
+            alertsHtml += '<div class="list-group-item alert-item alert-' + (alert.AlertType || 'info').toLowerCase() + ' p-2">' +
                 '<div class="d-flex justify-content-between align-items-start">' +
                 '<div class="flex-grow-1">' +
-                '<h6 class="mb-1"><i class="fas fa-' + this.getAlertIcon(alert.AlertType) + ' me-1"></i>' + (alert.AlertType || 'Alert') + '</h6>' +
-                '<p class="mb-1">' + this.truncateMessage(alert.Message || 'No message', 60) + '</p>' +
-                '<small class="text-muted">' + alert.PatientId + ' • ' + this.formatTime(alert.Timestamp) + '</small>' +
+                '<div class="d-flex align-items-center mb-1">' +
+                '<i class="fas fa-' + this.getAlertIcon(alert.AlertType) + ' me-2 ' + this.getAlertIconColor(alert.AlertType) + '"></i>' +
+                '<strong class="' + this.getAlertTextColor(alert.AlertType) + '">' + (alert.AlertType || 'Alert').toUpperCase() + '</strong>' +
                 '</div>' +
-                '<div class="flex-shrink-0"><small class="text-muted">' + (alert.Status || 'SENT') + '</small></div>' +
+                '<div class="alert-details">' + formattedMessage + '</div>' +
+                '<small class="text-muted">' +
+                '<i class="fas fa-user me-1"></i>' + patientName + ' • ' +
+                '<i class="fas fa-clock me-1"></i>' + alertTime +
+                '</small>' +
+                '</div>' +
+                '<div class="flex-shrink-0 text-end">' +
+                '<span class="badge bg-' + this.getStatusBadgeColor(alert.Status) + ' mb-1">' + (alert.Status || 'SENT') + '</span>' +
+                '</div>' +
                 '</div></div>';
         }
         
         alertsList.innerHTML = '<div class="list-group list-group-flush">' + alertsHtml + '</div>';
+    };
+
+    // Format alert message to show vital signs details
+    HealthcareDashboard.prototype.formatAlertMessage = function(alert) {
+        var message = alert.Message || 'No message';
+        
+        // If the alert has VitalSigns data, format it nicely
+        if (alert.VitalSigns) {
+            var vs = alert.VitalSigns;
+            var details = [];
+            
+            // Check each vital sign and format appropriately
+            if (vs.HeartRate) {
+                var hr = parseFloat(vs.HeartRate);
+                var hrStatus = this.getVitalSignStatus('HeartRate', hr);
+                details.push('<strong>HR:</strong> ' + hr + ' bpm' + (hrStatus ? ' <span class="text-' + hrStatus.color + '">(' + hrStatus.status + ')</span>' : ''));
+            }
+            
+            if (vs.SystolicBP && vs.DiastolicBP) {
+                var sys = parseFloat(vs.SystolicBP);
+                var dia = parseFloat(vs.DiastolicBP);
+                var bpStatus = this.getVitalSignStatus('SystolicBP', sys);
+                details.push('<strong>BP:</strong> ' + sys + '/' + dia + ' mmHg' + (bpStatus ? ' <span class="text-' + bpStatus.color + '">(' + bpStatus.status + ')</span>' : ''));
+            }
+            
+            if (vs.Temperature) {
+                var temp = parseFloat(vs.Temperature);
+                var tempStatus = this.getVitalSignStatus('Temperature', temp);
+                details.push('<strong>Temp:</strong> ' + temp.toFixed(1) + '°F' + (tempStatus ? ' <span class="text-' + tempStatus.color + '">(' + tempStatus.status + ')</span>' : ''));
+            }
+            
+            if (vs.OxygenSaturation) {
+                var o2 = parseFloat(vs.OxygenSaturation);
+                var o2Status = this.getVitalSignStatus('OxygenSaturation', o2);
+                details.push('<strong>O2 Sat:</strong> ' + o2.toFixed(0) + '%' + (o2Status ? ' <span class="text-' + o2Status.color + '">(' + o2Status.status + ')</span>' : ''));
+            }
+            
+            if (details.length > 0) {
+                return '<div class="vital-signs-alert">' + details.join('<br>') + '</div>';
+            }
+        }
+        
+        // If no vital signs data, try to extract info from message
+        if (message.toLowerCase().includes('heart rate')) {
+            return '<div><i class="fas fa-heartbeat text-danger me-1"></i>' + message + '</div>';
+        } else if (message.toLowerCase().includes('blood pressure')) {
+            return '<div><i class="fas fa-tint text-primary me-1"></i>' + message + '</div>';
+        } else if (message.toLowerCase().includes('temperature')) {
+            return '<div><i class="fas fa-thermometer-half text-warning me-1"></i>' + message + '</div>';
+        } else if (message.toLowerCase().includes('oxygen')) {
+            return '<div><i class="fas fa-lungs text-info me-1"></i>' + message + '</div>';
+        }
+        
+        return '<div>' + message + '</div>';
+    };
+
+    // Get vital sign status (normal, warning, critical)
+    HealthcareDashboard.prototype.getVitalSignStatus = function(type, value) {
+        var thresholds = {
+            HeartRate: { critical_low: 50, warning_low: 55, normal_low: 60, normal_high: 100, warning_high: 110, critical_high: 120 },
+            SystolicBP: { critical_low: 80, warning_low: 85, normal_low: 90, normal_high: 140, warning_high: 160, critical_high: 180 },
+            Temperature: { critical_low: 95.0, warning_low: 96.0, normal_low: 97.0, normal_high: 99.5, warning_high: 100.5, critical_high: 101.5 },
+            OxygenSaturation: { critical_low: 85, warning_low: 90, normal_low: 95, normal_high: 100, warning_high: 100, critical_high: 100 }
+        };
+        
+        var t = thresholds[type];
+        if (!t) return null;
+        
+        if (value <= t.critical_low || value >= t.critical_high) {
+            return { status: 'CRITICAL', color: 'danger' };
+        } else if (value <= t.warning_low || value >= t.warning_high) {
+            return { status: 'HIGH', color: 'warning' };
+        } else if (value < t.normal_low || value > t.normal_high) {
+            return { status: 'ABNORMAL', color: 'warning' };
+        }
+        
+        return { status: 'NORMAL', color: 'success' };
+    };
+
+    // Get patient name for alert (with fallback)
+    HealthcareDashboard.prototype.getPatientNameForAlert = function(patientId) {
+        var patient = this.getPatientById(patientId);
+        if (patient) {
+            return patient.Name + ' (' + patient.RoomNumber + ')';
+        }
+        return patientId; // Fallback to ID if name not found
+    };
+
+    // Format alert time more clearly
+    HealthcareDashboard.prototype.formatAlertTime = function(timestamp) {
+        if (!timestamp) return 'Unknown';
+        
+        var date = new Date(timestamp);
+        var now = new Date();
+        var diffMinutes = Math.floor((now - date) / (1000 * 60));
+        
+        if (diffMinutes < 1) {
+            return 'Just now';
+        } else if (diffMinutes < 60) {
+            return diffMinutes + ' min ago';
+        } else if (diffMinutes < 1440) { // Less than 24 hours
+            var hours = Math.floor(diffMinutes / 60);
+            return hours + ' hour' + (hours !== 1 ? 's' : '') + ' ago';
+        } else {
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+    };
+
+    // Get alert icon color
+    HealthcareDashboard.prototype.getAlertIconColor = function(alertType) {
+        switch ((alertType || '').toLowerCase()) {
+            case 'critical': return 'text-danger';
+            case 'warning': return 'text-warning';
+            case 'info': return 'text-info';
+            default: return 'text-primary';
+        }
+    };
+
+    // Get alert text color
+    HealthcareDashboard.prototype.getAlertTextColor = function(alertType) {
+        switch ((alertType || '').toLowerCase()) {
+            case 'critical': return 'text-danger';
+            case 'warning': return 'text-warning';
+            case 'info': return 'text-info';
+            default: return 'text-primary';
+        }
     };
     
     // Select patient from button click
