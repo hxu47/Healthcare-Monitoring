@@ -1,4 +1,4 @@
-# lambda/alert-management/lambda_function.py
+# lambda/alert-management/lambda_function.py - FIXED VERSION
 import json
 import boto3
 from decimal import Decimal
@@ -25,17 +25,23 @@ def lambda_handler(event, context):
     """
     
     try:
+        print(f"Received event: {json.dumps(event, default=str)}")
+        
         # Parse the API Gateway event
         http_method = event['httpMethod']
         path = event['path']
         query_params = event.get('queryStringParameters') or {}
         
+        print(f"HTTP Method: {http_method}, Path: {path}")
+        
         # Extract alert ID from path if present
         alert_id = None
         if '/alerts/' in path:
             path_parts = path.split('/')
+            print(f"Path parts: {path_parts}")
             if len(path_parts) >= 3:
                 alert_id = path_parts[2]
+                print(f"Extracted alert ID: {alert_id}")
         
         # Route based on HTTP method
         if http_method == 'GET':
@@ -55,6 +61,68 @@ def lambda_handler(event, context):
     except Exception as e:
         print(f"Error handling alert request: {str(e)}")
         return create_error_response(500, f"Internal server error: {str(e)}")
+
+def acknowledge_alert(alert_id):
+    """Acknowledge an alert - FIXED VERSION"""
+    
+    try:
+        print(f"Attempting to acknowledge alert: {alert_id}")
+        
+        # First, scan to find the alert by AlertId since we need both AlertId and Timestamp
+        response = alert_history_table.scan(
+            FilterExpression=Attr('AlertId').eq(alert_id)
+        )
+        
+        print(f"Scan response: {response}")
+        
+        if not response.get('Items'):
+            print(f"Alert {alert_id} not found in scan results")
+            return create_error_response(404, f"Alert {alert_id} not found")
+        
+        alert_item = response['Items'][0]  # Get the first matching item
+        print(f"Found alert item: {json.dumps(alert_item, default=str)}")
+        
+        # Check if already acknowledged
+        if alert_item.get('Status') == 'ACKNOWLEDGED':
+            return create_success_response({
+                'message': f"Alert {alert_id} was already acknowledged",
+                'alertId': alert_id,
+                'status': 'ACKNOWLEDGED',
+                'acknowledgedAt': alert_item.get('AcknowledgedAt')
+            })
+        
+        # Update alert status to acknowledged using both keys
+        current_time = datetime.utcnow().isoformat() + 'Z'
+        
+        update_response = alert_history_table.update_item(
+            Key={
+                'AlertId': alert_id,
+                'Timestamp': alert_item['Timestamp']
+            },
+            UpdateExpression="SET #status = :status, AcknowledgedAt = :ack_time",
+            ExpressionAttributeNames={'#status': 'Status'},
+            ExpressionAttributeValues={
+                ':status': 'ACKNOWLEDGED',
+                ':ack_time': current_time
+            },
+            ReturnValues='ALL_NEW'
+        )
+        
+        print(f"Update response: {json.dumps(update_response, default=str)}")
+        
+        return create_success_response({
+            'message': f"Alert {alert_id} acknowledged successfully",
+            'alertId': alert_id,
+            'status': 'ACKNOWLEDGED',
+            'acknowledgedAt': current_time,
+            'updatedItem': convert_decimals(update_response['Attributes'])
+        })
+        
+    except Exception as e:
+        print(f"Error acknowledging alert {alert_id}: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return create_error_response(500, f"Error acknowledging alert: {str(e)}")
 
 def handle_get_alerts(query_params):
     """Handle GET requests for alerts"""
@@ -162,44 +230,6 @@ def get_patient_alerts(patient_id, hours, limit, alert_type=None, status=None):
     except Exception as e:
         print(f"Error getting patient alerts: {str(e)}")
         return create_error_response(500, f"Error retrieving patient alerts: {str(e)}")
-
-def acknowledge_alert(alert_id):
-    """Acknowledge an alert"""
-    
-    try:
-        # Get the alert first
-        response = alert_history_table.query(
-            KeyConditionExpression=Key('AlertId').eq(alert_id)
-        )
-        
-        if not response.get('Items'):
-            return create_error_response(404, f"Alert {alert_id} not found")
-        
-        alert_item = response['Items'][0]
-        
-        # Update alert status to acknowledged
-        alert_history_table.update_item(
-            Key={
-                'AlertId': alert_id,
-                'Timestamp': alert_item['Timestamp']
-            },
-            UpdateExpression="SET #status = :status, AcknowledgedAt = :ack_time",
-            ExpressionAttributeNames={'#status': 'Status'},
-            ExpressionAttributeValues={
-                ':status': 'ACKNOWLEDGED',
-                ':ack_time': datetime.utcnow().isoformat() + 'Z'
-            }
-        )
-        
-        return create_success_response({
-            'message': f"Alert {alert_id} acknowledged successfully",
-            'alertId': alert_id,
-            'acknowledgedAt': datetime.utcnow().isoformat() + 'Z'
-        })
-        
-    except Exception as e:
-        print(f"Error acknowledging alert {alert_id}: {str(e)}")
-        return create_error_response(500, f"Error acknowledging alert: {str(e)}")
 
 def create_alert_config(config_data):
     """Create a new alert configuration"""

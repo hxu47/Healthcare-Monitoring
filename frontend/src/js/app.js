@@ -681,10 +681,25 @@
                     '</div>';
                 return;
             }
-
+    
             var alertsHtml = '';
             for (var i = 0; i < allAlerts.length; i++) {
                 var alert = allAlerts[i];
+                var isAcknowledged = alert.Status === 'ACKNOWLEDGED';
+                var buttonHtml = '';
+                
+                if (isAcknowledged) {
+                    buttonHtml = '<span class="badge bg-success">✓ Acknowledged</span>';
+                    if (alert.AcknowledgedAt) {
+                        buttonHtml += '<br><small class="text-muted">at ' + 
+                            self.formatDateTime(alert.AcknowledgedAt) + '</small>';
+                    }
+                } else {
+                    buttonHtml = '<button class="btn btn-sm btn-outline-primary mt-2" ' +
+                        'onclick="acknowledgeAlert(\'' + alert.AlertId + '\')">' +
+                        '<i class="fas fa-check"></i> Acknowledge</button>';
+                }
+                
                 alertsHtml += '<div class="card mb-3 alert-item alert-' + (alert.AlertType || 'info').toLowerCase() + '">' +
                     '<div class="card-body">' +
                     '<div class="d-flex justify-content-between align-items-start">' +
@@ -693,17 +708,16 @@
                     '<i class="fas fa-' + self.getAlertIcon(alert.AlertType) + ' me-2"></i>' +
                     (alert.AlertType || 'Alert') + ' - Patient ' + alert.PatientId +
                     '</h5>' +
-                    '<p class="card-text">' + (alert.Message || 'No message') + '</p>' +
+                    '<p class="card-text">' + self.formatAlertMessage(alert) + '</p>' +
                     '<small class="text-muted">' +
                     '<i class="fas fa-clock me-1"></i>' +
                     self.formatDateTime(alert.Timestamp) +
                     '</small>' +
                     '</div>' +
                     '<div class="text-end">' +
-                    '<span class="badge bg-' + self.getStatusBadgeColor(alert.Status) + '">' + (alert.Status || 'SENT') + '</span>' +
-                    (alert.Status !== 'ACKNOWLEDGED' ? 
-                        '<button class="btn btn-sm btn-outline-primary mt-2" onclick="acknowledgeAlert(\'' + alert.AlertId + '\')">' +
-                        '<i class="fas fa-check"></i> Acknowledge</button>' : '') +
+                    '<span class="badge bg-' + self.getStatusBadgeColor(alert.Status) + '">' + 
+                    (alert.Status || 'SENT') + '</span><br>' +
+                    buttonHtml +
                     '</div>' +
                     '</div>' +
                     '</div>' +
@@ -711,7 +725,7 @@
             }
             
             alertsContainer.innerHTML = alertsHtml;
-
+    
         }).catch(function(error) {
             console.error('Error loading all alerts:', error);
             var alertsContainer = document.getElementById('allAlertsList');
@@ -720,6 +734,7 @@
                     '<i class="fas fa-exclamation-triangle fa-3x mb-3"></i>' +
                     '<h4>Error Loading Alerts</h4>' +
                     '<p>Unable to load alerts: ' + error.message + '</p>' +
+                    '<button class="btn btn-primary" onclick="healthcareDashboard.loadAllAlerts()">Retry</button>' +
                     '</div>';
             }
         });
@@ -794,12 +809,55 @@
     HealthcareDashboard.prototype.acknowledgeAlert = function(alertId) {
         var self = this;
         
+        if (!alertId) {
+            console.error('Alert ID is required for acknowledgment');
+            self.showSystemStatus('Error: Invalid alert ID', 'error');
+            return;
+        }
+        
+        console.log('Acknowledging alert:', alertId);
+        
+        // Show loading state
+        var button = document.querySelector(`button[onclick="acknowledgeAlert('${alertId}')"]`);
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Acknowledging...';
+        }
+        
         self.api.acknowledgeAlert(alertId).then(function(response) {
-            self.showSystemStatus('Alert acknowledged successfully', 'success');
-            self.loadAllAlerts(); // Refresh the alerts list
+            console.log('Alert acknowledgment response:', response);
+            
+            self.showSystemStatus(response.message || 'Alert acknowledged successfully', 'success');
+            
+            // Refresh the alerts list to show updated status
+            if (self.currentView === 'alerts') {
+                self.loadAllAlerts(); // Refresh the alerts view
+            } else {
+                // Refresh the recent alerts in dashboard
+                self.api.getRecentAlerts(24).then(function(alertsResponse) {
+                    self.alerts = alertsResponse.alerts || [];
+                    self.updateAlertsDisplay();
+                }).catch(function(error) {
+                    console.error('Error refreshing alerts:', error);
+                });
+            }
+            
+            // Re-enable button
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-check"></i> Acknowledged';
+                button.className = 'btn btn-sm btn-success';
+            }
+            
         }).catch(function(error) {
             console.error('Error acknowledging alert:', error);
             self.showSystemStatus('Error acknowledging alert: ' + error.message, 'error');
+            
+            // Re-enable button on error
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-check"></i> Acknowledge';
+            }
         });
     };
     

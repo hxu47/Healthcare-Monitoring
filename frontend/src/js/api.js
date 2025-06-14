@@ -158,8 +158,21 @@
     };
 
     HealthcareAPI.prototype.acknowledgeAlert = function(alertId) {
-        return this.makeRequest(this.endpoints.ALERTS + '/' + alertId + '/acknowledge', {
-            method: 'PUT'
+        if (!alertId) {
+            return Promise.reject(new Error('Alert ID is required'));
+        }
+        
+        console.log('API: Acknowledging alert:', alertId);
+        
+        // Construct the correct URL path for acknowledgment
+        var acknowledgeEndpoint = this.endpoints.ALERTS + '/' + alertId + '/acknowledge';
+        console.log('API: Acknowledge endpoint:', acknowledgeEndpoint);
+        
+        return this.makeRequest(acknowledgeEndpoint, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
     };
 
