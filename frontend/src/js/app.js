@@ -1,5 +1,5 @@
 // Main Application for Patient Vital Signs Monitoring System
-// Real data only - no mock data
+// Real data only - no mock data - CLEAN VERSION
 
 (function() {
     'use strict';
@@ -86,8 +86,8 @@
                 self.updatePatientsTable();
                 self.updatePatientSelect();
                 
-                // Load recent alerts (get more hours to show more alerts)
-                return self.api.getRecentAlerts(24); // Get last 24 hours instead of 1 hour
+                // Load recent alerts (get last 24 hours)
+                return self.api.getRecentAlerts(24);
                 
             }).then(function(alertsResponse) {
                 console.log('Alerts response:', alertsResponse);
@@ -104,28 +104,6 @@
                 }
                 
                 resolve();
-                
-            }).catch(function(error) {
-                console.error('API error:', error);
-                self.showSystemStatus('API connection error: ' + error.message, 'error');
-                reject(error);
-            });
-        });
-    };
-
-    // Manual trigger for IoT simulator (for testing)
-    HealthcareDashboard.prototype.triggerDataGeneration = function() {
-        var self = this;
-        
-        self.showSystemStatus('Triggering IoT data generation...', 'info');
-        
-        // This would call the IoT simulator Lambda function directly
-        // For now, we'll just refresh data
-        setTimeout(function() {
-            self.refreshData();
-            self.showSystemStatus('Data generation triggered. Check back in a moment for new data.', 'success');
-        }, 2000);
-    };
                 
             }).catch(function(error) {
                 console.error('API error:', error);
@@ -734,6 +712,11 @@
         return date.toLocaleTimeString();
     };
     
+    HealthcareDashboard.prototype.truncateMessage = function(message, maxLength) {
+        if (!message || message.length <= maxLength) return message;
+        return message.substring(0, maxLength) + '...';
+    };
+    
     HealthcareDashboard.prototype.formatDateTime = function(timestamp) {
         if (!timestamp) return 'Unknown';
         var date = new Date(timestamp);
@@ -818,10 +801,6 @@
 
     window.acknowledgeAlert = function(alertId) {
         if (healthcareDashboard) healthcareDashboard.acknowledgeAlert(alertId);
-    };
-
-    window.triggerDataGeneration = function() {
-        if (healthcareDashboard) healthcareDashboard.triggerDataGeneration();
     };
     
     // Initialize when DOM is ready
