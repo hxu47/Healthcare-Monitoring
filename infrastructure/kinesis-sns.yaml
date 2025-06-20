@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Patient Vital Signs Monitoring - Kinesis and SNS for Real-time Data Processing'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: VitalSignsMonitoring
+    Description: Name of the project, used as prefix for resource names
+  DynamoDBStackName:
+    Type: String
+    Default: vital-signs-dynamodb
+    Description: Name of the DynamoDB stack
+
+Resources:
+  # Kinesis Stream for Real-time Data Processing
+  VitalSignsKinesisStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: !Sub '${ProjectName}-vital-signs-stream'
+      ShardCount: 2
+      RetentionPeriodHours: 24
+      StreamEncryption:
+        EncryptionType: KMS
+        KeyId: alias/aws/kinesis
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: DataStreaming
+
+  # SNS Topic for Critical Alerts
+  CriticalAlertsSnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${ProjectName}-critical-alerts'
+      DisplayName: 'Patient Critical Vital Signs Alerts'
+      KmsMasterKeyId: alias/aws/sns
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: AlertSystem
+
+  # SNS Subscription for Email Alerts (placeholder)
+  EmailAlertSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref CriticalAlertsSnsTopic
+      Endpoint: 'healthcare-alerts@example.com'  # Replace with actual email
+
+Outputs:
+  VitalSignsKinesisStreamName:
+    Description: Name of the Kinesis stream for vital signs data
+    Value: !Ref VitalSignsKinesisStream
+    Export:
+      Name: !Sub '${AWS::StackName}-VitalSignsKinesisStreamName'
+
+  VitalSignsKinesisStreamArn:
+    Description: ARN of the Kinesis stream for vital signs data
+    Value: !GetAtt VitalSignsKinesisStream.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-VitalSignsKinesisStreamArn'
+
+  CriticalAlertsTopicArn:
+    Description: ARN of the SNS topic for critical alerts
+    Value: !Ref CriticalAlertsSnsTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-CriticalAlertsTopicArn'
