@@ -436,18 +436,15 @@ Resources:
           HttpMethod: '*'
           ThrottlingBurstLimit: !Ref ThrottlingBurstLimit
           ThrottlingRateLimit: !Ref ThrottlingRateLimit
-          LoggingLevel: INFO
         # Patient data endpoints - more restrictive
         - ResourcePath: '/patients'
           HttpMethod: 'GET'
           ThrottlingBurstLimit: 50
           ThrottlingRateLimit: 25
-          LoggingLevel: INFO
         - ResourcePath: '/patients'
           HttpMethod: 'POST'
           ThrottlingBurstLimit: 20
           ThrottlingRateLimit: 10
-          LoggingLevel: INFO
         - ResourcePath: '/patients/*'
           HttpMethod: 'GET'
           ThrottlingBurstLimit: 50
@@ -461,7 +458,6 @@ Resources:
           HttpMethod: 'GET'
           ThrottlingBurstLimit: 100
           ThrottlingRateLimit: 50
-          LoggingLevel: INFO
         # Alert endpoints - moderate limits
         - ResourcePath: '/alerts'
           HttpMethod: 'GET'
