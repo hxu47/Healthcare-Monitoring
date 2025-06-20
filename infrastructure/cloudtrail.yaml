@@ -77,27 +77,18 @@ Resources:
       IsLogging: true
       IsMultiRegionTrail: true  # Enhanced: Multi-region coverage
       EnableLogFileValidation: true
-      # NEW: Event Selectors for data events
+      # Event Selectors for data events
       EventSelectors:
         - ReadWriteType: All
           IncludeManagementEvents: true
           DataResources:
-            # Track specific DynamoDB tables (no wildcards allowed)
+            # Track specific DynamoDB tables (construct ARNs directly)
             - Type: 'AWS::DynamoDB::Table'
               Values:
-                - Fn::ImportValue: !Sub '${DynamoDBStackName}-VitalSignsTableArn'
-                - Fn::ImportValue: !Sub '${DynamoDBStackName}-PatientRecordsTableArn'
-                - Fn::ImportValue: !Sub '${DynamoDBStackName}-AlertConfigTableArn'
-                - Fn::ImportValue: !Sub '${DynamoDBStackName}-AlertHistoryTableArn'
-            # Track all S3 object-level events (file access)
-            - Type: 'AWS::S3::Object'
-              Values:
-                - !Sub 
-                  - '${BucketName}/*'
-                  - BucketName:
-                      Fn::ImportValue: !Sub '${S3StackName}-WebsiteBucketName'
-                # Also track the CloudTrail logs bucket itself
-                - !Sub '${CloudTrailLogsBucket}/*'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBStackName}-vital-signs'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBStackName}-patient-records'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBStackName}-alert-config'
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBStackName}-alert-history'
       Tags:
         - Key: Project
           Value: !Ref ProjectName
@@ -105,8 +96,6 @@ Resources:
           Value: Security
         - Key: Purpose
           Value: ComprehensiveAudit
-
-
 
 Outputs:
   CloudTrailArn:
