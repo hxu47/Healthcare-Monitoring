@@ -10,10 +10,6 @@ Parameters:
     Type: String
     Default: vital-signs-dynamodb
     Description: Name of the DynamoDB stack to track data events
-  S3StackName:
-    Type: String
-    Default: vital-signs-s3
-    Description: Name of the S3 stack to track object events
 
 Resources:
   # S3 Bucket for CloudTrail logs
@@ -127,6 +123,6 @@ Outputs:
 
   DataEventsTracked:
     Description: Summary of data events being tracked
-    Value: 'DynamoDB table access, S3 object access, Management events across all regions'
+    Value: 'DynamoDB table access tracking for all patient data tables'
     Export:
       Name: !Sub '${AWS::StackName}-DataEventsTracked'
