@@ -13,11 +13,14 @@
 ├── git_repo_structure.txt
 ├── infrastructure
 │   ├── api-gateway.yaml
+│   ├── cloudtrail.yaml
 │   ├── cloudwatch.yaml
 │   ├── dynamodb.yaml
-│   ├── iot.yaml
+│   ├── kinesis-sns.yaml
 │   ├── lambda.yaml
-│   └── s3.yaml
+│   ├── s3.yaml
+│   ├── vpc.yaml
+│   └── waf.yaml
 ├── lambda
 │   ├── alert-management
 │   │   ├── lambda_function.py
@@ -37,4 +40,4 @@
 ├── package-lambda.sh
 └── upload-frontend.sh
 
-12 directories, 25 files
+12 directories, 28 files

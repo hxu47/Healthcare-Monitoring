@@ -1,11 +1,19 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Patient Vital Signs Monitoring - Simple CloudTrail for Audit Logging'
+Description: 'Patient Vital Signs Monitoring - Enhanced CloudTrail for Comprehensive Audit Logging'
 
 Parameters:
   ProjectName:
     Type: String
     Default: VitalSignsMonitoring
     Description: Name of the project, used as prefix for resource names
+  DynamoDBStackName:
+    Type: String
+    Default: vital-signs-dynamodb
+    Description: Name of the DynamoDB stack to track data events
+  S3StackName:
+    Type: String
+    Default: vital-signs-s3
+    Description: Name of the S3 stack to track object events
 
 Resources:
   # S3 Bucket for CloudTrail logs
@@ -27,6 +35,11 @@ Resources:
           - Id: DeleteOldLogs
             Status: Enabled
             ExpirationInDays: 90
+          - Id: TransitionToIA
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
       Tags:
         - Key: Project
           Value: !Ref ProjectName
@@ -56,27 +69,93 @@ Resources:
               StringEquals:
                 's3:x-amz-acl': bucket-owner-full-control
 
-  # Simple CloudTrail for management events only
+  # Enhanced CloudTrail with data events tracking
   HealthcareCloudTrail:
     Type: AWS::CloudTrail::Trail
     DependsOn: CloudTrailLogsBucketPolicy
     Properties:
-      TrailName: !Sub '${AWS::StackName}-audit-trail'
+      TrailName: !Sub '${AWS::StackName}-comprehensive-audit-trail'
       S3BucketName: !Ref CloudTrailLogsBucket
       S3KeyPrefix: 'healthcare-audit-logs'
       IncludeGlobalServiceEvents: true
       IsLogging: true
-      IsMultiRegionTrail: false
+      IsMultiRegionTrail: true  # Enhanced: Multi-region coverage
       EnableLogFileValidation: true
+      # NEW: Event Selectors for data events
+      EventSelectors:
+        - ReadWriteType: All
+          IncludeManagementEvents: true
+          DataResources:
+            # Track all DynamoDB table data events (patient records access)
+            - Type: 'AWS::DynamoDB::Table'
+              Values:
+                - Fn::Sub:
+                  - 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TablePrefix}-*'
+                  - TablePrefix: !Ref DynamoDBStackName
+            # Track all S3 object-level events (file access)
+            - Type: 'AWS::S3::Object'
+              Values:
+                - Fn::Sub:
+                  - '${BucketArn}/*'
+                  - BucketArn:
+                      Fn::ImportValue: !Sub '${S3StackName}-WebsiteBucketArn'
+                # Also track the CloudTrail logs bucket itself
+                - !Sub '${CloudTrailLogsBucket}/*'
+            # Track S3 bucket-level events
+            - Type: 'AWS::S3::Bucket'
+              Values:
+                - Fn::ImportValue: !Sub '${S3StackName}-WebsiteBucketArn'
+                - !GetAtt CloudTrailLogsBucket.Arn
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: Security
+        - Key: Purpose
+          Value: ComprehensiveAudit
+
+  # NEW: CloudWatch Log Group for CloudTrail insights
+  CloudTrailLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/cloudtrail/${AWS::StackName}-insights'
+      RetentionInDays: 30
       Tags:
         - Key: Project
           Value: !Ref ProjectName
         - Key: Component
           Value: Security
 
+  # NEW: CloudTrail Insights for unusual activity patterns
+  CloudTrailInsights:
+    Type: AWS::CloudTrail::EventDataStore
+    Properties:
+      Name: !Sub '${AWS::StackName}-insights-datastore'
+      MultiRegionEnabled: true
+      OrganizationEnabled: false
+      AdvancedEventSelectors:
+        - Name: 'DynamoDB Data Events'
+          FieldSelectors:
+            - Field: 'eventCategory'
+              Equals: ['Data']
+            - Field: 'resources.type'
+              Equals: ['AWS::DynamoDB::Table']
+            - Field: 'resources.ARN'
+              StartsWith: 
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBStackName}-'
+        - Name: 'S3 Object Events'
+          FieldSelectors:
+            - Field: 'eventCategory'
+              Equals: ['Data']
+            - Field: 'resources.type'
+              Equals: ['AWS::S3::Object']
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+
 Outputs:
   CloudTrailArn:
-    Description: ARN of the CloudTrail for healthcare audit logging
+    Description: ARN of the enhanced CloudTrail for comprehensive healthcare audit logging
     Value: !GetAtt HealthcareCloudTrail.Arn
     Export:
       Name: !Sub '${AWS::StackName}-CloudTrailArn'
@@ -86,3 +165,15 @@ Outputs:
     Value: !Ref CloudTrailLogsBucket
     Export:
       Name: !Sub '${AWS::StackName}-CloudTrailLogsBucket'
+
+  CloudTrailInsightsArn:
+    Description: ARN of the CloudTrail Event Data Store for insights
+    Value: !GetAtt CloudTrailInsights.EventDataStoreArn
+    Export:
+      Name: !Sub '${AWS::StackName}-CloudTrailInsightsArn'
+
+  DataEventsTracked:
+    Description: Summary of data events being tracked
+    Value: 'DynamoDB table access, S3 object access, Management events across all regions'
+    Export:
+      Name: !Sub '${AWS::StackName}-DataEventsTracked'
