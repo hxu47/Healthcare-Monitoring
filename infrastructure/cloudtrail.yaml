@@ -86,10 +86,13 @@ Resources:
         - ReadWriteType: All
           IncludeManagementEvents: true
           DataResources:
-            # Track all DynamoDB table data events (patient records access)
+            # Track specific DynamoDB tables (no wildcards allowed)
             - Type: 'AWS::DynamoDB::Table'
               Values:
-                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBStackName}-*'
+                - Fn::ImportValue: !Sub '${DynamoDBStackName}-VitalSignsTableArn'
+                - Fn::ImportValue: !Sub '${DynamoDBStackName}-PatientRecordsTableArn'
+                - Fn::ImportValue: !Sub '${DynamoDBStackName}-AlertConfigTableArn'
+                - Fn::ImportValue: !Sub '${DynamoDBStackName}-AlertHistoryTableArn'
             # Track all S3 object-level events (file access)
             - Type: 'AWS::S3::Object'
               Values:
