@@ -89,23 +89,16 @@ Resources:
             # Track all DynamoDB table data events (patient records access)
             - Type: 'AWS::DynamoDB::Table'
               Values:
-                - Fn::Sub:
-                  - 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${TablePrefix}-*'
-                  - TablePrefix: !Ref DynamoDBStackName
+                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBStackName}-*'
             # Track all S3 object-level events (file access)
             - Type: 'AWS::S3::Object'
               Values:
-                - Fn::Sub:
-                  - '${BucketArn}/*'
-                  - BucketArn:
-                      Fn::ImportValue: !Sub '${S3StackName}-WebsiteBucketArn'
+                - !Sub 
+                  - '${BucketName}/*'
+                  - BucketName:
+                      Fn::ImportValue: !Sub '${S3StackName}-WebsiteBucketName'
                 # Also track the CloudTrail logs bucket itself
                 - !Sub '${CloudTrailLogsBucket}/*'
-            # Track S3 bucket-level events
-            - Type: 'AWS::S3::Bucket'
-              Values:
-                - Fn::ImportValue: !Sub '${S3StackName}-WebsiteBucketArn'
-                - !GetAtt CloudTrailLogsBucket.Arn
       Tags:
         - Key: Project
           Value: !Ref ProjectName
