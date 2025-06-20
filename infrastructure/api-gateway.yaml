@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Patient Vital Signs Monitoring - API Gateway with Complete CORS Support'
+Description: 'Patient Vital Signs Monitoring - API Gateway with Throttling and CORS'
 
 Parameters:
   ProjectName:
@@ -10,6 +10,19 @@ Parameters:
     Type: String
     Default: vital-signs-lambda
     Description: Name of the Lambda stack
+  # THROTTLING PARAMETERS:
+  ThrottlingBurstLimit:
+    Type: Number
+    Default: 200
+    MinValue: 1
+    MaxValue: 5000
+    Description: API Gateway throttling burst limit for healthcare endpoints
+  ThrottlingRateLimit:
+    Type: Number
+    Default: 100
+    MinValue: 1
+    MaxValue: 10000
+    Description: API Gateway throttling rate limit (requests per second)
 
 Resources:
   # REST API Gateway
@@ -54,7 +67,7 @@ Resources:
       ParentId: !GetAtt HealthcareApi.RootResourceId
       PathPart: alerts
 
-  # Alert ID Resource (NEW - for individual alert operations)
+  # Alert ID Resource (for individual alert operations)
   AlertIdResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -62,7 +75,7 @@ Resources:
       ParentId: !Ref AlertsResource
       PathPart: '{alertId}'
 
-  # Alert Acknowledge Resource (NEW - for acknowledge endpoint)
+  # Alert Acknowledge Resource (for acknowledge endpoint)
   AlertAcknowledgeResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -184,7 +197,7 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # NEW: Enable CORS for /alerts/{alertId}
+  # Enable CORS for /alerts/{alertId}
   AlertIdOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -212,7 +225,7 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # NEW: Enable CORS for /alerts/{alertId}/acknowledge
+  # Enable CORS for /alerts/{alertId}/acknowledge
   AlertAcknowledgeOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -344,7 +357,7 @@ Resources:
           ResponseParameters:
             method.response.header.Access-Control-Allow-Origin: true
 
-  # NEW: PUT /alerts/{alertId}/acknowledge method
+  # PUT /alerts/{alertId}/acknowledge method
   PutAlertAcknowledgeMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -386,10 +399,11 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HealthcareApi}/*/*'
 
-  # API Gateway Deployment
-  ApiDeployment:
+  # SINGLE API Gateway Deployment with Throttling
+  HealthcareApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
+      # All actual API methods
       - GetPatientsMethod
       - PostPatientsMethod
       - GetPatientMethod
@@ -397,6 +411,7 @@ Resources:
       - GetVitalSignsMethod
       - GetAlertsMethod
       - PutAlertAcknowledgeMethod
+      # All CORS OPTIONS methods
       - PatientsOptionsMethod
       - PatientIdOptionsMethod
       - VitalSignsOptionsMethod
@@ -405,11 +420,65 @@ Resources:
       - AlertAcknowledgeOptionsMethod
     Properties:
       RestApiId: !Ref HealthcareApi
-      StageName: prod
+      Description: 'Healthcare API deployment with CORS and custom throttling'
+
+  # Production Stage with Throttling Configuration
+  HealthcareApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref HealthcareApi
+      DeploymentId: !Ref HealthcareApiDeployment
+      StageName: 'prod'
+      Description: 'Production stage with healthcare-specific throttling'
+      ThrottleSettings:
+        BurstLimit: !Ref ThrottlingBurstLimit
+        RateLimit: !Ref ThrottlingRateLimit
+      MethodSettings:
+        # Patient data endpoints - more restrictive
+        - ResourcePath: '/patients'
+          HttpMethod: 'GET'
+          ThrottlingBurstLimit: 50
+          ThrottlingRateLimit: 25
+          LoggingLevel: INFO
+        - ResourcePath: '/patients'
+          HttpMethod: 'POST'
+          ThrottlingBurstLimit: 20
+          ThrottlingRateLimit: 10
+          LoggingLevel: INFO
+        - ResourcePath: '/patients/*'
+          HttpMethod: 'GET'
+          ThrottlingBurstLimit: 50
+          ThrottlingRateLimit: 25
+        - ResourcePath: '/patients/*'
+          HttpMethod: 'PUT'
+          ThrottlingBurstLimit: 20
+          ThrottlingRateLimit: 10
+        # Vital signs endpoints - higher limits for real-time monitoring
+        - ResourcePath: '/vitalsigns'
+          HttpMethod: 'GET'
+          ThrottlingBurstLimit: 100
+          ThrottlingRateLimit: 50
+          LoggingLevel: INFO
+        # Alert endpoints - moderate limits
+        - ResourcePath: '/alerts'
+          HttpMethod: 'GET'
+          ThrottlingBurstLimit: 75
+          ThrottlingRateLimit: 35
+        - ResourcePath: '/alerts/*/acknowledge'
+          HttpMethod: 'PUT'
+          ThrottlingBurstLimit: 25
+          ThrottlingRateLimit: 12
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Component
+          Value: APIThrottling
+        - Key: Environment
+          Value: Production
 
 Outputs:
   ApiGatewayUrl:
-    Description: URL of the API Gateway
+    Description: URL of the Healthcare API Gateway with throttling
     Value: !Sub 'https://${HealthcareApi}.execute-api.${AWS::Region}.amazonaws.com/prod'
     Export:
       Name: !Sub '${AWS::StackName}-ApiGatewayUrl'
@@ -419,3 +488,15 @@ Outputs:
     Value: !Ref HealthcareApi
     Export:
       Name: !Sub '${AWS::StackName}-ApiGatewayId'
+
+  ThrottlingConfiguration:
+    Description: API Gateway throttling configuration summary
+    Value: !Sub 'Rate: ${ThrottlingRateLimit}/sec, Burst: ${ThrottlingBurstLimit}, Per-method limits applied'
+    Export:
+      Name: !Sub '${AWS::StackName}-ThrottlingConfig'
+      
+  ApiStage:
+    Description: API Gateway stage with throttling
+    Value: !Ref HealthcareApiStage
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiStage'

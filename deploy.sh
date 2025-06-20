@@ -123,13 +123,15 @@ aws cloudformation deploy \
 echo -e "${GREEN}✅ Lambda functions deployed in VPC${NC}"
 
 # 8. Deploy API Gateway
-echo -e "${YELLOW}📦 Step 8/10: Deploying API Gateway...${NC}"
+echo -e "${YELLOW}📦 Step 8/10: Deploying API Gateway with throttling...${NC}"
 aws cloudformation deploy \
   --template-file infrastructure/api-gateway.yaml \
   --stack-name "${STACK_NAME_PREFIX}-api" \
   --parameter-overrides \
     ProjectName=$PROJECT_NAME \
     LambdaStackName="${STACK_NAME_PREFIX}-lambda" \
+    ThrottlingRateLimit=100 \
+    ThrottlingBurstLimit=200 \
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
   --region $REGION
 
