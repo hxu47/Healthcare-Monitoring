@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Patient Vital Signs Monitoring - CloudTrail for Audit Logging'
+Description: 'Patient Vital Signs Monitoring - Simple CloudTrail for Audit Logging'
 
 Parameters:
   ProjectName:
@@ -12,7 +12,7 @@ Resources:
   CloudTrailLogsBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${AWS::StackName}-cloudtrail-logs-${AWS::AccountId}-${AWS::Region}'
+      BucketName: !Sub '${AWS::StackName}-logs-${AWS::AccountId}-${AWS::Region}'
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -26,14 +26,12 @@ Resources:
         Rules:
           - Id: DeleteOldLogs
             Status: Enabled
-            ExpirationInDays: 90  # Keep logs for 90 days to manage costs
+            ExpirationInDays: 90
       Tags:
         - Key: Project
           Value: !Ref ProjectName
         - Key: Component
           Value: Security
-        - Key: Purpose
-          Value: AuditLogging
 
   # CloudTrail Bucket Policy
   CloudTrailLogsBucketPolicy:
@@ -58,35 +56,23 @@ Resources:
               StringEquals:
                 's3:x-amz-acl': bucket-owner-full-control
 
-  # CloudTrail for audit logging
+  # Simple CloudTrail for management events only
   HealthcareCloudTrail:
     Type: AWS::CloudTrail::Trail
     DependsOn: CloudTrailLogsBucketPolicy
     Properties:
-      TrailName: !Sub '${ProjectName}-audit-trail'
+      TrailName: !Sub '${AWS::StackName}-audit-trail'
       S3BucketName: !Ref CloudTrailLogsBucket
       S3KeyPrefix: 'healthcare-audit-logs'
       IncludeGlobalServiceEvents: true
       IsLogging: true
-      IsMultiRegionTrail: false  # Single region to reduce costs
+      IsMultiRegionTrail: false
       EnableLogFileValidation: true
-      EventSelectors:
-        - ReadWriteType: All
-          IncludeManagementEvents: true
-          DataResources:
-            - Type: 'AWS::DynamoDB::Table'
-              Values: ['*']
-            - Type: 'AWS::S3::Object'
-              Values: ['*']
-            - Type: 'AWS::Lambda::Function'
-              Values: ['*']
       Tags:
         - Key: Project
           Value: !Ref ProjectName
         - Key: Component
           Value: Security
-        - Key: Purpose
-          Value: ComplianceAuditing
 
 Outputs:
   CloudTrailArn:
