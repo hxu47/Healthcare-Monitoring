@@ -52,18 +52,18 @@ aws cloudformation deploy \
 
 echo -e "${GREEN}✅ DynamoDB tables deployed${NC}"
 
-# 3. Deploy IoT Core resources
-echo -e "${YELLOW}📦 Step 3/9: Deploying IoT Core resources...${NC}"
+# 3. Deploy Kinesis and SNS resources
+echo -e "${YELLOW}📦 Step 3/9: Deploying Kinesis and SNS resources...${NC}"
 aws cloudformation deploy \
-  --template-file infrastructure/iot.yaml \
-  --stack-name "${STACK_NAME_PREFIX}-iot" \
+  --template-file infrastructure/kinesis-sns.yaml \
+  --stack-name "${STACK_NAME_PREFIX}-kinesis-sns" \
   --parameter-overrides \
     ProjectName=$PROJECT_NAME \
     DynamoDBStackName="${STACK_NAME_PREFIX}-dynamodb" \
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
   --region $REGION
 
-echo -e "${GREEN}✅ IoT Core resources deployed${NC}"
+echo -e "${GREEN}✅ Kinesis and SNS resources deployed${NC}"
 
 # 4. Create/check Lambda code bucket and upload Lambda code
 echo -e "${YELLOW}📦 Step 4/9: Setting up Lambda code...${NC}"
@@ -91,7 +91,7 @@ aws cloudformation deploy \
     ProjectName=$PROJECT_NAME \
     S3StackName="${STACK_NAME_PREFIX}-s3" \
     DynamoDBStackName="${STACK_NAME_PREFIX}-dynamodb" \
-    IoTStackName="${STACK_NAME_PREFIX}-iot" \
+    IoTStackName="${STACK_NAME_PREFIX}-kinesis-sns" \
     LambdaCodeBucket=$LAMBDA_CODE_BUCKET \
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
   --region $REGION
@@ -128,7 +128,7 @@ aws cloudformation deploy \
     LambdaStackName="${STACK_NAME_PREFIX}-lambda" \
     ApiStackName="${STACK_NAME_PREFIX}-api" \
     DynamoDBStackName="${STACK_NAME_PREFIX}-dynamodb" \
-    IoTStackName="${STACK_NAME_PREFIX}-iot" \
+    IoTStackName="${STACK_NAME_PREFIX}-kinesis-sns" \
     CriticalVitalSignsThreshold=5 \
     HighLatencyThreshold=5000 \
     ErrorRateThreshold=10 \
@@ -234,7 +234,7 @@ echo -e "   • Next hour: 60+ total records"
 echo -e "   • Continuous monitoring: 24/7 realistic data"
 
 echo -e "${PURPLE}🎯 System Architecture:${NC}"
-echo -e "   IoT Simulator → Kinesis → Lambda → DynamoDB → Dashboard"
+echo -e "   Lambda Simulator → Kinesis → Lambda → DynamoDB → Dashboard"
 echo -e "        ✅           ✅        ✅        ✅         ✅"
 
 echo -e "${RED}⚠️  IMPORTANT: This is a simulated healthcare system for educational purposes.${NC}"
