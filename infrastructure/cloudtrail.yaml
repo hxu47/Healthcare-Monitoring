@@ -107,44 +107,7 @@ Resources:
         - Key: Purpose
           Value: ComprehensiveAudit
 
-  # NEW: CloudWatch Log Group for CloudTrail insights
-  CloudTrailLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub '/aws/cloudtrail/${AWS::StackName}-insights'
-      RetentionInDays: 30
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-        - Key: Component
-          Value: Security
 
-  # NEW: CloudTrail Insights for unusual activity patterns
-  CloudTrailInsights:
-    Type: AWS::CloudTrail::EventDataStore
-    Properties:
-      Name: !Sub '${AWS::StackName}-insights-datastore'
-      MultiRegionEnabled: true
-      OrganizationEnabled: false
-      AdvancedEventSelectors:
-        - Name: 'DynamoDB Data Events'
-          FieldSelectors:
-            - Field: 'eventCategory'
-              Equals: ['Data']
-            - Field: 'resources.type'
-              Equals: ['AWS::DynamoDB::Table']
-            - Field: 'resources.ARN'
-              StartsWith: 
-                - !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${DynamoDBStackName}-'
-        - Name: 'S3 Object Events'
-          FieldSelectors:
-            - Field: 'eventCategory'
-              Equals: ['Data']
-            - Field: 'resources.type'
-              Equals: ['AWS::S3::Object']
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
 
 Outputs:
   CloudTrailArn:
@@ -158,12 +121,6 @@ Outputs:
     Value: !Ref CloudTrailLogsBucket
     Export:
       Name: !Sub '${AWS::StackName}-CloudTrailLogsBucket'
-
-  CloudTrailInsightsArn:
-    Description: ARN of the CloudTrail Event Data Store for insights
-    Value: !GetAtt CloudTrailInsights.EventDataStoreArn
-    Export:
-      Name: !Sub '${AWS::StackName}-CloudTrailInsightsArn'
 
   DataEventsTracked:
     Description: Summary of data events being tracked
