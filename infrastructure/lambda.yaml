@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Patient Vital Signs Monitoring - Lambda Functions for Healthcare Data Processing'
+Description: 'Patient Vital Signs Monitoring - Lambda Functions for Healthcare Data Processing with VPC Support'
 
 Parameters:
   ProjectName:
@@ -16,8 +16,12 @@ Parameters:
     Description: Name of the DynamoDB stack
   IoTStackName:
     Type: String
-    Default: vital-signs-iot
-    Description: Name of the IoT stack
+    Default: vital-signs-kinesis-sns
+    Description: Name of the Kinesis/SNS stack
+  VPCStackName:
+    Type: String
+    Default: vital-signs-vpc
+    Description: Name of the VPC stack
   LambdaCodeBucket:
     Type: String
     Description: Bucket containing Lambda code packages
@@ -34,6 +38,13 @@ Resources:
       Runtime: python3.9
       Timeout: 60
       MemorySize: 256
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub '${VPCStackName}-LambdaSecurityGroup'
+        SubnetIds:
+          Fn::Split:
+            - ','
+            - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnets'
       Environment:
         Variables:
           IOT_ENDPOINT: !Sub '${AWS::AccountId}.iot.${AWS::Region}.amazonaws.com'
@@ -45,6 +56,10 @@ Resources:
       Tags:
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Component
+          Value: DataSimulation
+        - Key: Environment
+          Value: Production
 
   # Lambda function for processing vital signs data from Kinesis
   VitalSignsProcessorFunction:
@@ -56,6 +71,13 @@ Resources:
       Runtime: python3.9
       Timeout: 300
       MemorySize: 512
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub '${VPCStackName}-LambdaSecurityGroup'
+        SubnetIds:
+          Fn::Split:
+            - ','
+            - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnets'
       Environment:
         Variables:
           VITAL_SIGNS_TABLE:
@@ -72,6 +94,10 @@ Resources:
       Tags:
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Component
+          Value: DataProcessing
+        - Key: Environment
+          Value: Production
 
   # Event Source Mapping for Kinesis Stream
   KinesisEventSourceMapping:
@@ -94,6 +120,13 @@ Resources:
       Runtime: python3.9
       Timeout: 30
       MemorySize: 256
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub '${VPCStackName}-LambdaSecurityGroup'
+        SubnetIds:
+          Fn::Split:
+            - ','
+            - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnets'
       Environment:
         Variables:
           PATIENT_RECORDS_TABLE:
@@ -106,6 +139,10 @@ Resources:
       Tags:
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Component
+          Value: PatientAPI
+        - Key: Environment
+          Value: Production
 
   # Lambda function for vital signs API
   VitalSignsApiFunction:
@@ -117,6 +154,13 @@ Resources:
       Runtime: python3.9
       Timeout: 30
       MemorySize: 256
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub '${VPCStackName}-LambdaSecurityGroup'
+        SubnetIds:
+          Fn::Split:
+            - ','
+            - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnets'
       Environment:
         Variables:
           VITAL_SIGNS_TABLE:
@@ -129,6 +173,10 @@ Resources:
       Tags:
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Component
+          Value: VitalSignsAPI
+        - Key: Environment
+          Value: Production
 
   # Lambda function for alert management
   AlertManagementFunction:
@@ -140,6 +188,13 @@ Resources:
       Runtime: python3.9
       Timeout: 30
       MemorySize: 256
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub '${VPCStackName}-LambdaSecurityGroup'
+        SubnetIds:
+          Fn::Split:
+            - ','
+            - Fn::ImportValue: !Sub '${VPCStackName}-PrivateSubnets'
       Environment:
         Variables:
           ALERT_HISTORY_TABLE:
@@ -154,6 +209,10 @@ Resources:
       Tags:
         - Key: Project
           Value: !Ref ProjectName
+        - Key: Component
+          Value: AlertManagement
+        - Key: Environment
+          Value: Production
 
   # CloudWatch Event Rule for IoT Simulator (runs every 5 minutes)
   IoTSimulatorScheduleRule:
@@ -224,3 +283,9 @@ Outputs:
     Value: !Ref AlertManagementFunction
     Export:
       Name: !Sub '${AWS::StackName}-AlertManagementFunctionName'
+
+  LambdaVPCConfiguration:
+    Description: Confirmation that all Lambda functions are deployed in VPC
+    Value: !Sub 'All Lambda functions deployed in VPC ${VPCStackName} with private subnets'
+    Export:
+      Name: !Sub '${AWS::StackName}-VPCConfiguration'
