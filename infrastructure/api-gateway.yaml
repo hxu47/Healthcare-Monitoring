@@ -430,10 +430,13 @@ Resources:
       DeploymentId: !Ref HealthcareApiDeployment
       StageName: 'prod'
       Description: 'Production stage with healthcare-specific throttling'
-      ThrottleSettings:
-        BurstLimit: !Ref ThrottlingBurstLimit
-        RateLimit: !Ref ThrottlingRateLimit
       MethodSettings:
+        # Global stage throttling settings
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          ThrottlingBurstLimit: !Ref ThrottlingBurstLimit
+          ThrottlingRateLimit: !Ref ThrottlingRateLimit
+          LoggingLevel: INFO
         # Patient data endpoints - more restrictive
         - ResourcePath: '/patients'
           HttpMethod: 'GET'
