@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Patient Vital Signs Monitoring - S3 Resources with Enhanced Disaster Recovery (AWS Academy Lab Compatible)'
+Description: 'Patient Vital Signs Monitoring - S3 Resources with Academy Lab-Compatible Disaster Recovery'
 
 Parameters:
   ProjectName:
@@ -70,7 +70,7 @@ Resources:
             Action: s3:GetObject
             Resource: !Sub '${WebsiteBucket.Arn}/*'
 
-  # 🚀 ENHANCED: Primary patient data bucket with comprehensive DR features
+  # 🚀 ENHANCED: Primary patient data bucket with simplified DR features
   PatientDataBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -112,22 +112,6 @@ Resources:
             Status: Enabled
             AbortIncompleteMultipartUpload:
               DaysAfterInitiation: 1
-      # 🚀 NEW: Intelligent Tiering for automatic cost optimization
-      IntelligentTieringConfigurations:
-        - Id: PatientDataIntelligentTiering
-          Status: Enabled
-          Prefix: patient-records/
-          OptionalFields:
-            - BucketKeyStatus
-      # 🚀 NEW: Object Lock for compliance (if supported in Academy)
-      ObjectLockEnabled: false  # Set to true if needed for compliance
-      # 🚀 NEW: Event notifications for monitoring
-      NotificationConfiguration:
-        LambdaConfigurations:
-          - Event: s3:ObjectCreated:*
-            Function: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}-vitals-processor'
-          - Event: s3:ObjectRemoved:*
-            Function: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}-alert-management'
       Tags:
         - Key: Project
           Value: !Ref ProjectName
@@ -256,7 +240,7 @@ Outputs:
 
   DisasterRecoveryStrategy:
     Description: Multi-tiered disaster recovery approach
-    Value: 'Versioning + Multi-bucket + Lifecycle transitions + Intelligent tiering'
+    Value: 'Versioning + Multi-bucket + Lifecycle transitions'
     Export:
       Name: !Sub '${AWS::StackName}-DRStrategy'
 
@@ -274,6 +258,6 @@ Outputs:
 
   CostOptimization:
     Description: Storage cost optimization features
-    Value: 'Intelligent Tiering + Lifecycle policies + Multi-class storage'
+    Value: 'Lifecycle policies + Multi-class storage + Bucket key encryption'
     Export:
       Name: !Sub '${AWS::StackName}-CostOptimization'
