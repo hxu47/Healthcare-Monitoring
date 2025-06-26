@@ -45,9 +45,9 @@ Resources:
         Rules:
           - Id: WebsiteBackupRetention
             Status: Enabled
-            NoncurrentVersionExpirationInDays: 7  # Keep old versions for 1 week
+            NoncurrentVersionExpirationInDays: 90  # Keep old versions for 90 days
             NoncurrentVersionTransitions:
-              - TransitionInDays: 1
+              - TransitionInDays: 30
                 StorageClass: STANDARD_IA
       Tags:
         - Key: Project
@@ -103,9 +103,9 @@ Resources:
                 StorageClass: DEEP_ARCHIVE
             # Keep old versions for disaster recovery
             NoncurrentVersionTransitions:
-              - TransitionInDays: 1
-                StorageClass: STANDARD_IA  # Immediate DR access
               - TransitionInDays: 30
+                StorageClass: STANDARD_IA  # DR access after 30 days
+              - TransitionInDays: 90
                 StorageClass: GLACIER     # Long-term DR backup
             NoncurrentVersionExpirationInDays: 2555  # 7 years retention (HIPAA compliance)
           - Id: IncompleteMultipartUploads
@@ -148,9 +148,9 @@ Resources:
           - Id: BackupRetention
             Status: Enabled
             Transitions:
-              - TransitionInDays: 1
-                StorageClass: STANDARD_IA  # Immediate cost savings
               - TransitionInDays: 30
+                StorageClass: STANDARD_IA  # Cost savings after 30 days
+              - TransitionInDays: 90
                 StorageClass: GLACIER
             NoncurrentVersionExpirationInDays: 90
       Tags:
